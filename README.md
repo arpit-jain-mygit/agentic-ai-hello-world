@@ -18,35 +18,49 @@ Get a free key at [Google AI Studio](https://aistudio.google.com/apikey). To try
 
 ## Files
 
-| File | What's in it |
-|---|---|
-| [main.py](main.py) | The only entry point. Reads the question and starts the orchestrator. |
-| [agents.py](agents.py) | The 3 agents: the orchestrator and its 2 subagents, plus the "spawn" tools that start a subagent. |
-| [loop.py](loop.py) | `run_agent()`: the agentic loop that **every** agent runs. |
-| [tools.py](tools.py) | The 4 tools (plain Python functions), their declarations, and fake order data. |
+Tools and agents live in separate files, so you can always tell which is which:
+
+| File | Kind | What's in it |
+|---|---|---|
+| [main.py](main.py) | entry point | Reads the question and starts the orchestrator. The only file you run. |
+| [orchestrator.py](orchestrator.py) | **agent** | The coordinator agent, plus its delegation tools (`ask_order_agent`, `ask_refund_agent`) that start a subagent. |
+| [subagents.py](subagents.py) | **agents** | The 2 worker agents: `order_agent` and `refund_agent` (prompt + description + their tools). |
+| [tools.py](tools.py) | **tools** | The 4 plain tools (Python functions), their declarations, and fake order data. |
+| [loop.py](loop.py) | engine | `run_agent()`: the agentic loop that **every** agent runs. |
+
+## Tool vs agent
+
+| | Tool | Agent |
+|---|---|---|
+| What it is | A plain function that does one fixed job | A model + system prompt + its own tools, running a loop |
+| Thinks? | No: same input, same output | Yes: decides what to do next |
+| Steps | Runs once | Many turns, until it decides it's done |
+| Examples here | `look_up_order`, `issue_refund` (in `tools.py`) | `orchestrator`, `order_agent`, `refund_agent` |
+
+**The one bridge between them:** the orchestrator's model can only call tools, so each subagent is wrapped in a *delegation tool* (`ask_order_agent`, `ask_refund_agent`, in `orchestrator.py`). From outside it looks like a tool; inside it starts a whole agent. That's how Claude's Task / Agent tool works too.
 
 ## How it works
 
-**3 agents, 6 tools:**
+**3 agents, 4 plain tools, 2 delegation tools:**
 
 ```
-Orchestrator          tools: ask_order_agent, ask_refund_agent   (each starts a subagent)
- |-- order_agent      tools: look_up_order, track_shipment
- |-- refund_agent     tools: check_refund_policy, issue_refund
+orchestrator          tools: ask_order_agent, ask_refund_agent   (delegation tools - each starts a subagent)
+ |-- order_agent      tools: look_up_order, track_shipment       (plain tools)
+ |-- refund_agent     tools: check_refund_policy, issue_refund   (plain tools)
 ```
 
 **The flow for one question:**
 
 ```
 main.py
- └─ agents.run_orchestrator(question)
-     └─ loop.run_agent("orchestrator")                     ← agent 1
+ └─ orchestrator.run_orchestrator(question)
+     └─ loop.run_agent("orchestrator")                              ← agent 1
           model: "call ask_order_agent"
-           └─ agents.spawn() → loop.run_agent("order_agent")    ← agent 2
+           └─ orchestrator.ask_agent() → loop.run_agent("order_agent")   ← agent 2
                 model: "call look_up_order" → tools.look_up_order()
                 model: "done" → answer goes back to the orchestrator
           model: "call ask_refund_agent"
-           └─ agents.spawn() → loop.run_agent("refund_agent")   ← agent 3
+           └─ orchestrator.ask_agent() → loop.run_agent("refund_agent")  ← agent 3
                 model: "call check_refund_policy" → tools.check_refund_policy()
                 model: "call issue_refund"        → tools.issue_refund()
                 model: "done" → answer goes back to the orchestrator
@@ -55,38 +69,33 @@ main.py
 
 `main.py` starts only the orchestrator. The orchestrator's **model** decides when to start the subagents, by calling its `ask_...` tools.
 
-**Seeing the decisions:** each `[orchestrator] calls ask_...` line in the output is the model's decision, printed straight from the tool request it returned. The `ask_...` tools also require a `reason` argument, so the model must say *why* it picked that agent; the loop prints it as a `why:` line just before the call:
+## Reading the log
+
+Every line starts with the file that printed it, and each tool call says which file the tool's code lives in:
 
 ```
-loop.py   | [orchestrator] why: The customer wants to know where the order is, so I need its delivery status.
-loop.py   | [orchestrator] calls ask_order_agent({'task': 'Find the delivery status and details for order 9931.'})  -> runs in agents.py
-agents.py |     spawn(): starting a new agent loop for order_agent
-loop.py   |     [order_agent] task: Find the delivery status and details for order 9931.
-loop.py   |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs in tools.py
+loop.py         | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)
+loop.py         | [orchestrator] why: The customer wants to know where the order is.
+loop.py         | [orchestrator] calls ask_order_agent({'task': '...'})  -> runs in orchestrator.py
+orchestrator.py |     ask_order_agent: starting a new agent loop for order_agent
+loop.py         |     [order_agent] task: ...
+loop.py         |     [order_agent] stop_reason=tool_use  (Gemini finish_reason=STOP)
+loop.py         |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs in tools.py
+loop.py         |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)
+loop.py         |     [order_agent] done: ...
 ```
 
-After every model reply the loop also logs a `stop_reason` line, the signal that decides whether the loop continues:
-
-```
-loop.py   | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)   ← keep looping
-loop.py   |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)   ← done
-```
-
-`stop_reason` is the Claude name (`tool_use`, `end_turn`, `max_tokens`, `refusal`), worked out from Gemini's reply by `claude_stop_reason()` in [loop.py](loop.py). Gemini's own `finish_reason` is `STOP` in both cases, so the loop decides by checking whether the reply contains tool calls.
-
-Every line starts with the file that printed it, and each tool call says which file the tool's code lives in, so you can follow the run through the code.
-
-This is the model's stated reason, which it writes as part of the tool call. It works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.
-
-**Subagent vs plain tool:** to the orchestrator, `ask_refund_agent` looks like any tool (call in, answer out). Inside, it's a full agent with its own model loop, system prompt, tools and fresh context. A plain tool like `look_up_order` is fixed code that runs one step.
+- **`-> runs in tools.py`**: a plain tool. **`-> runs in orchestrator.py`**: a delegation tool, so the next lines are a subagent working (indented).
+- **`stop_reason`**: the signal that drives the loop, using the Claude names (`tool_use` = keep looping, `end_turn` = done, also `max_tokens`, `refusal`). It's worked out by `claude_stop_reason()` in [loop.py](loop.py), because Gemini's own `finish_reason` is `STOP` in both cases.
+- **`why:`**: the delegation tools require a `reason` argument, so the model must state why it picked that agent. This is its stated reason, written as part of the tool call; it works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.
 
 ## CCAF topics covered
 
 | CCAF | Topic | Where in the code |
 |---|---|---|
-| 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [loop.py](loop.py) `run_agent()` |
-| 1.2 | Coordinator + subagents, hub-and-spoke | [agents.py](agents.py) `run_orchestrator()`, `ORCHESTRATOR_PROMPT` |
-| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [agents.py](agents.py) `spawn_tool()`, `SUBAGENTS` |
+| 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [loop.py](loop.py) `run_agent()`, `claude_stop_reason()` |
+| 1.2 | Coordinator + subagents, hub-and-spoke | [orchestrator.py](orchestrator.py) `run_orchestrator()`, `ORCHESTRATOR_PROMPT` |
+| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `delegation_tool()`, [subagents.py](subagents.py) `SUBAGENTS` |
 | 2.1 | Tool = function + description the model chooses from | [tools.py](tools.py) `TOOLS`, `declare()` |
 
 ## Roadmap
@@ -112,4 +121,4 @@ Next topics to add to the same app:
 | Tool schema | `input_schema` | `parameters_json_schema` |
 | System prompt | `system` | `system_instruction` |
 | Force a tool | `tool_choice` (`auto` / `any` / `tool` / `none`) | `tool_config` function-calling mode (`AUTO` / `ANY` / `NONE`, plus allowed names) |
-| Spawn a subagent | Task / Agent tool (Agent SDK) | a normal function that starts another loop (`agents.spawn_tool`) |
+| Spawn a subagent | Task / Agent tool (Agent SDK) | a delegation tool that starts another loop (`orchestrator.delegation_tool`) |
