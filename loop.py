@@ -9,17 +9,13 @@ import os
 from google import genai
 from google.genai import types
 
+from logs import log
+
 # Model can be changed with an env var; default is the free Flash-Lite.
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 # Safety cap so a confused agent can't loop forever (CCAF 1.1 anti-pattern).
 MAX_TURNS = 5
-
-
-def log(msg: str) -> None:
-    """Print one trace line, tagged with this file's name so you can follow the code."""
-    for line in msg.splitlines():  # tag every line, even in multi-line answers
-        print(f"{'loop.py':<15} | {line}")
 
 
 def claude_stop_reason(response) -> str:
@@ -82,8 +78,8 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             # If the tool asks for a "reason", show it: this is the model explaining its choice.
             if "reason" in args:
                 log(f"{indent}[{name}] why: {args.pop('reason')}")
-            # func.__module__ tells us which file the tool lives in (tools.py or orchestrator.py).
-            log(f"{indent}[{name}] calls {call.name}({args})  -> runs in {func.__module__}.py")
+            # Show exactly which Python function will run, as file:function (tools.py or orchestrator.py).
+            log(f"{indent}[{name}] calls {call.name}({args})  -> runs {func.__module__}.py:{func.__name__}")
             result = func(**args)
             result_parts.append(types.Part.from_function_response(name=call.name, response=result))
 

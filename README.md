@@ -27,6 +27,7 @@ Tools and agents live in separate files, so you can always tell which is which:
 | [subagents.py](subagents.py) | **agents** | The 2 worker agents: `order_agent` and `refund_agent` (prompt + description + their tools). |
 | [tools.py](tools.py) | **tools** | The 4 plain tools (Python functions), their declarations, and fake order data. |
 | [loop.py](loop.py) | engine | `run_agent()`: the agentic loop that **every** agent runs. |
+| [logs.py](logs.py) | helper | `log()`: prints each trace line tagged with `file:function`. |
 
 ## Tool vs agent
 
@@ -90,21 +91,24 @@ main.py
 
 ## Reading the log
 
-Every line starts with the file that printed it, and each tool call says which file the tool's code lives in:
+Every line starts with **where** it was printed from, as `file:function`, and each tool call says exactly which Python function will run:
 
 ```
-loop.py         | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)
-loop.py         | [orchestrator] why: The customer wants to know where the order is.
-loop.py         | [orchestrator] calls ask_order_agent({'task': '...'})  -> runs in orchestrator.py
-orchestrator.py |     ask_order_agent: starting a new agent loop for order_agent
-loop.py         |     [order_agent] task: ...
-loop.py         |     [order_agent] stop_reason=tool_use  (Gemini finish_reason=STOP)
-loop.py         |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs in tools.py
-loop.py         |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)
-loop.py         |     [order_agent] done: ...
+main.py:main                   | USER: Order 9931 arrived broken. Where is it and can I get a refund?
+loop.py:run_agent              | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)
+loop.py:run_agent              | [orchestrator] why: The customer wants to know where the order is.
+loop.py:run_agent              | [orchestrator] calls ask_order_agent({'task': '...'})  -> runs orchestrator.py:ask_order_agent
+orchestrator.py:start_subagent |     starting a new agent loop for order_agent
+loop.py:run_agent              |     [order_agent] task: ...
+loop.py:run_agent              |     [order_agent] stop_reason=tool_use  (Gemini finish_reason=STOP)
+loop.py:run_agent              |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs tools.py:look_up_order
+loop.py:run_agent              |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)
+loop.py:run_agent              |     [order_agent] done: ...
+main.py:main                   | FINAL ANSWER: ...
 ```
 
-- **`-> runs in tools.py`**: a plain tool. **`-> runs in orchestrator.py`**: a delegation tool, so the next lines are a subagent working (indented).
+- **Left column** (`file:function`): the code running at that moment. All three agents show `loop.py:run_agent`, because they share one loop.
+- **`-> runs tools.py:...`**: a plain tool. **`-> runs orchestrator.py:ask_...`**: a tool that starts an agent, so the next lines are that subagent working (indented).
 - **`stop_reason`**: the signal that drives the loop, using the Claude names (`tool_use` = keep looping, `end_turn` = done, also `max_tokens`, `refusal`). It's worked out by `claude_stop_reason()` in [loop.py](loop.py), because Gemini's own `finish_reason` is `STOP` in both cases.
 - **`why:`**: the delegation tools require a `reason` argument, so the model must state why it picked that agent. This is its stated reason, written as part of the tool call; it works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.
 

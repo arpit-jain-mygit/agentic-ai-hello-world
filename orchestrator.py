@@ -7,6 +7,7 @@ The orchestrator is an agent too, but it does no work itself. Its only tools are
     orchestrator   tools: ask_order_agent, ask_refund_agent
 """
 
+from logs import log
 from loop import run_agent
 from subagents import SUBAGENTS
 from tools import declare
@@ -20,7 +21,7 @@ from tools import declare
 def start_subagent(agent_name: str, task: str) -> dict:
     """Run a subagent's full loop on the task and return its final answer."""
     agent = SUBAGENTS[agent_name]
-    print(f"{'orchestrator.py':<15} |     ask_{agent_name}: starting a new agent loop for {agent_name}")
+    log(f"    starting a new agent loop for {agent_name}")
     answer = run_agent(agent_name, agent["prompt"], agent["tools"], task, indent="    ")
     return {"answer": answer}
 
