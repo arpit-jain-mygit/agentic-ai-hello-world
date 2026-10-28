@@ -37,7 +37,27 @@ Tools and agents live in separate files, so you can always tell which is which:
 | Steps | Runs once | Many turns, until it decides it's done |
 | Examples here | `look_up_order`, `issue_refund` (in `tools.py`) | `orchestrator`, `order_agent`, `refund_agent` |
 
-**The one bridge between them:** the orchestrator's model can only call tools, so each subagent is wrapped in a *delegation tool* (`ask_order_agent`, `ask_refund_agent`, in `orchestrator.py`). From outside it looks like a tool; inside it starts a whole agent. That's how Claude's Task / Agent tool works too.
+**How an agent can be started "by a tool call"**, step by step:
+
+1. **A model can't run anything.** All it can do is write text. To get something done, it writes a tool request, such as "call `look_up_order` with `order_id=9931`". Our code reads that request and runs the matching Python function.
+2. **So the model can't start another agent by itself either.** It has no "start agent" ability. It can only ask for a tool by name.
+3. **So we give it a tool whose Python function starts an agent.** When the orchestrator's model asks for `ask_refund_agent`, our code runs that function, and the function's body calls `run_agent(...)` for the refund agent (see `delegation_tool()` in [orchestrator.py](orchestrator.py)).
+4. **The model can't tell the difference.** For both kinds of tool it sends a name and inputs, and gets one result back. What ran in between is hidden from it.
+
+The only difference is what the Python function does when it runs:
+
+```python
+def look_up_order(order_id):          # plain tool: fixed code, returns at once
+    return ORDERS[order_id]
+
+def ask_refund_agent(task):           # delegation tool: its body starts a whole agent
+    answer = run_agent("refund_agent", REFUND_PROMPT, REFUND_TOOLS, task)
+    return {"answer": answer}
+```
+
+**Analogy:** the manager sits in a closed room and can only pass notes through a slot. A note might say "look up order 9931", and the assistant outside checks the system and passes the answer back. Or it might say "ask Riya about a refund", and the assistant takes it to Riya, who works on it for a while using her own tools and then writes a reply that comes back through the slot. From inside the room both look the same: a note out, a reply in. Behind the slot, one was a quick lookup and the other was a person doing real work.
+
+Claude's Task / Agent tool works the same way: the model asks for the Task tool, and the Agent SDK's code behind it starts a subagent.
 
 ## How it works
 
