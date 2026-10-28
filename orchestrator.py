@@ -9,7 +9,7 @@ The orchestrator is an agent too, but it does no work itself. Its only tools are
 
 from logs import log
 from loop import run_agent
-from subagents import SUBAGENTS
+from worker_agents import WORKER_AGENTS
 from tools import declare
 
 # ---------------------------------------------------------------------------
@@ -20,7 +20,7 @@ from tools import declare
 # ---------------------------------------------------------------------------
 def start_subagent(agent_name: str, task: str) -> dict:
     """Run a subagent's full loop on the task and return its final answer."""
-    agent = SUBAGENTS[agent_name]
+    agent = WORKER_AGENTS[agent_name]
     log(f"    starting a new agent loop for {agent_name}")
     answer = run_agent(agent_name, agent["prompt"], agent["tools"], task, indent="    ")
     return {"answer": answer}
@@ -43,11 +43,11 @@ HANDOFF_HINT = " Pass a complete task: the subagent knows nothing else."
 ORCHESTRATOR_TOOLS = {
     "ask_order_agent": (
         ask_order_agent,
-        declare("ask_order_agent", SUBAGENTS["order_agent"]["description"] + HANDOFF_HINT, task="string", reason="string"),
+        declare("ask_order_agent", WORKER_AGENTS["order_agent"]["description"] + HANDOFF_HINT, task="string", reason="string"),
     ),
     "ask_refund_agent": (
         ask_refund_agent,
-        declare("ask_refund_agent", SUBAGENTS["refund_agent"]["description"] + HANDOFF_HINT, task="string", reason="string"),
+        declare("ask_refund_agent", WORKER_AGENTS["refund_agent"]["description"] + HANDOFF_HINT, task="string", reason="string"),
     ),
 }
 

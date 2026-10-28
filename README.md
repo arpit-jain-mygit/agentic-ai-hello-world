@@ -24,7 +24,7 @@ Tools and agents live in separate files, so you can always tell which is which:
 |---|---|---|
 | [main.py](main.py) | entry point | Reads the question and starts the orchestrator. The only file you run. |
 | [orchestrator.py](orchestrator.py) | **agent** | The coordinator agent, plus its delegation tools (`ask_order_agent`, `ask_refund_agent`) that start a subagent. |
-| [subagents.py](subagents.py) | **agents** | The 2 worker agents: `order_agent` and `refund_agent` (prompt + description + their tools). |
+| [worker_agents.py](worker_agents.py) | **agents** | The 2 worker agents: `order_agent` and `refund_agent` (prompt + description + their tools). |
 | [tools.py](tools.py) | **tools** | The 4 plain tools (Python functions), their declarations, and fake order data. |
 | [loop.py](loop.py) | engine | `run_agent()`: the agentic loop that **every** agent runs. |
 | [logs.py](logs.py) | helper | `log()`: prints each trace line tagged with `file:function`. |
@@ -118,7 +118,7 @@ main.py:main                   | FINAL ANSWER: ...
 |---|---|---|
 | 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [loop.py](loop.py) `run_agent()`, `claude_stop_reason()` |
 | 1.2 | Coordinator + subagents, hub-and-spoke | [orchestrator.py](orchestrator.py) `run_orchestrator()`, `ORCHESTRATOR_PROMPT` |
-| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `ask_order_agent()`, `ask_refund_agent()`, `start_subagent()`, [subagents.py](subagents.py) `SUBAGENTS` |
+| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `ask_order_agent()`, `ask_refund_agent()`, `start_subagent()`, [worker_agents.py](worker_agents.py) `WORKER_AGENTS` |
 | 2.1 | Tool = function + description the model chooses from | [tools.py](tools.py) `TOOLS`, `declare()` |
 
 ## Roadmap
