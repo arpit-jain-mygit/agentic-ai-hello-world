@@ -45,6 +45,7 @@ def spawn_tool(agent_name: str):
         f"ask_{agent_name}",
         agent["description"] + " Pass a complete task: the subagent knows nothing else.",
         task="string",
+        reason="string",  # makes the model say WHY it picked this agent (printed as "why:" in the log)
     )
     return spawn, declaration
 

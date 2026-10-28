@@ -15,9 +15,6 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 # Safety cap so a confused agent can't loop forever (CCAF 1.1 anti-pattern).
 MAX_TURNS = 5
 
-# Set SHOW_THINKING=1 to also print a summary of WHY the model chose each step.
-SHOW_THINKING = os.environ.get("SHOW_THINKING") == "1"
-
 
 def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str = "") -> str:
     """
@@ -37,19 +34,12 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
     config = types.GenerateContentConfig(
         system_instruction=system_prompt,
         tools=[types.Tool(function_declarations=[decl for _, decl in tools.values()])],
-        # Ask the model to think a bit more and return a short summary of that thinking.
-        thinking_config=types.ThinkingConfig(include_thoughts=True, thinking_level="low") if SHOW_THINKING else None,
     )
 
     for _ in range(MAX_TURNS):
         # PERCEIVE + REASON: the model reads everything so far and decides what to do.
         response = client.models.generate_content(model=MODEL, contents=contents, config=config)
         contents.append(response.candidates[0].content)
-
-        # The REASON step, made visible: print the model's thought summary, if any.
-        for part in response.candidates[0].content.parts or []:
-            if part.thought and part.text:
-                print(f"{indent}[{name}] thinks: {part.text.strip()}")
 
         # No tool requested -> finished.  (Claude: stop_reason == "end_turn")
         if not response.function_calls:
@@ -60,8 +50,12 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         result_parts = []
         for call in response.function_calls:
             func, _ = tools[call.name]
-            print(f"{indent}[{name}] calls {call.name}({dict(call.args)})")
-            result = func(**call.args)
+            args = dict(call.args)
+            # If the tool asks for a "reason", show it: this is the model explaining its choice.
+            if "reason" in args:
+                print(f"{indent}[{name}] why: {args.pop('reason')}")
+            print(f"{indent}[{name}] calls {call.name}({args})")
+            result = func(**args)
             result_parts.append(types.Part.from_function_response(name=call.name, response=result))
 
         # OBSERVE: send results back so the model sees them next turn.

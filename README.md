@@ -55,13 +55,14 @@ main.py
 
 `main.py` starts only the orchestrator. The orchestrator's **model** decides when to start the subagents, by calling its `ask_...` tools.
 
-**Seeing the decisions:** each `[orchestrator] calls ask_...` line in the output is the model's decision: it is printed straight from the tool request the model returned. To also see *why* it chose that, turn on its thought summaries:
+**Seeing the decisions:** each `[orchestrator] calls ask_...` line in the output is the model's decision, printed straight from the tool request it returned. The `ask_...` tools also require a `reason` argument, so the model must say *why* it picked that agent; the loop prints it as a `why:` line just before the call:
 
-```bash
-SHOW_THINKING=1 python main.py "Order 9931 arrived broken. Where is it and can I get a refund?"
+```
+[orchestrator] why: The customer wants to know where the order is, so I need its delivery status.
+[orchestrator] calls ask_order_agent({'task': 'Find the delivery status and details for order 9931.'})
 ```
 
-This adds `[agent] thinks: ...` lines before each decision (a short summary of the model's reasoning, not its full internal thinking).
+This is the model's stated reason, which it writes as part of the tool call. It works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.
 
 **Subagent vs plain tool:** to the orchestrator, `ask_refund_agent` looks like any tool (call in, answer out). Inside, it's a full agent with its own model loop, system prompt, tools and fresh context. A plain tool like `look_up_order` is fixed code that runs one step.
 
