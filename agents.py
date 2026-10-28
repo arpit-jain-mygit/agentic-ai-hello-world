@@ -38,6 +38,7 @@ def spawn_tool(agent_name: str):
     agent = SUBAGENTS[agent_name]
 
     def spawn(task: str) -> dict:
+        print(f"agents.py |     spawn(): starting a new agent loop for {agent_name}")
         answer = run_agent(agent_name, agent["prompt"], agent["tools"], task, indent="    ")
         return {"answer": answer}
 

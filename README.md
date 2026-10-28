@@ -58,9 +58,14 @@ main.py
 **Seeing the decisions:** each `[orchestrator] calls ask_...` line in the output is the model's decision, printed straight from the tool request it returned. The `ask_...` tools also require a `reason` argument, so the model must say *why* it picked that agent; the loop prints it as a `why:` line just before the call:
 
 ```
-[orchestrator] why: The customer wants to know where the order is, so I need its delivery status.
-[orchestrator] calls ask_order_agent({'task': 'Find the delivery status and details for order 9931.'})
+loop.py   | [orchestrator] why: The customer wants to know where the order is, so I need its delivery status.
+loop.py   | [orchestrator] calls ask_order_agent({'task': 'Find the delivery status and details for order 9931.'})  -> runs in agents.py
+agents.py |     spawn(): starting a new agent loop for order_agent
+loop.py   |     [order_agent] task: Find the delivery status and details for order 9931.
+loop.py   |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs in tools.py
 ```
+
+Every line starts with the file that printed it, and each tool call says which file the tool's code lives in, so you can follow the run through the code.
 
 This is the model's stated reason, which it writes as part of the tool call. It works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.
 
