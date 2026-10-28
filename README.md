@@ -24,10 +24,12 @@ Tools and agents live in separate files, so you can always tell which is which:
 |---|---|---|
 | [main.py](main.py) | entry point | Reads the question and starts the orchestrator. The only file you run. |
 | [orchestrator.py](orchestrator.py) | **agent** | The coordinator agent, plus its delegation tools (`ask_order_agent`, `ask_refund_agent`) that start a subagent. |
-| [worker_agents.py](worker_agents.py) | **agents** | The 2 worker agents: `order_agent` and `refund_agent` (prompt + description + their tools). |
+| [worker_agents.json](worker_agents.json) | **agents (config)** | The 2 worker agents as plain config: `order_agent` and `refund_agent`. Each has a `description` (tells the orchestrator when to use it), a `prompt` (how it behaves) and `tools` (the **names** of its tools in `tools.py`). |
 | [tools.py](tools.py) | **tools** | The 4 plain tools (Python functions), their declarations, and fake order data. |
 | [agent_loop.py](agent_loop.py) | engine | `run_agent()`: the agentic loop that **every** agent runs. |
 | [logs.py](logs.py) | helper | `log()`: prints each trace line tagged with `file:function`. |
+
+**Agents are config, tools are code.** To change an agent's behaviour or tools, edit `worker_agents.json`; no Python needed. `orchestrator.py` loads it at startup, turns each tool name into the real function from `tools.py`, and stops with an error if a name doesn't exist. Claude Code defines subagents the same way: config files in `.claude/agents/` with a description, a tool list and a prompt.
 
 ## Tool vs agent
 
@@ -133,7 +135,7 @@ main.py:main                   | FINAL ANSWER: ...
 |---|---|---|
 | 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [agent_loop.py](agent_loop.py) `run_agent()`, `claude_stop_reason()` |
 | 1.2 | Coordinator + subagents, hub-and-spoke | [orchestrator.py](orchestrator.py) `run_orchestrator()`, `ORCHESTRATOR_PROMPT` |
-| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `ask_order_agent()`, `ask_refund_agent()`, `start_subagent()`, [worker_agents.py](worker_agents.py) `WORKER_AGENTS` |
+| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `ask_order_agent()`, `ask_refund_agent()`, `start_subagent()`, [worker_agents.json](worker_agents.json) |
 | 2.1 | Tool = function + description the model chooses from | [tools.py](tools.py) `TOOLS`, `declare()` |
 
 ## Roadmap

@@ -7,10 +7,29 @@ The orchestrator is an agent too, but it does no work itself. Its only tools are
     orchestrator   tools: ask_order_agent, ask_refund_agent
 """
 
-from logs import log
+import json
+from pathlib import Path
+
 from agent_loop import run_agent
-from worker_agents import WORKER_AGENTS
-from tools import declare
+from logs import log
+from tools import TOOLS, declare
+
+# ---------------------------------------------------------------------------
+# Worker agents - loaded from worker_agents.json (config, not code).
+# Each entry: description (when to use it), prompt (how it behaves), tools (tool NAMES).
+# Claude Code defines subagents the same way, as config files in .claude/agents/.
+# ---------------------------------------------------------------------------
+def load_worker_agents() -> dict:
+    """Read worker_agents.json and check every tool name in it exists in tools.py."""
+    agents = json.loads(Path(__file__).with_name("worker_agents.json").read_text())
+    for agent_name, agent in agents.items():
+        unknown = [t for t in agent["tools"] if t not in TOOLS]
+        if unknown:  # fail fast on a typo, instead of mid-run
+            raise ValueError(f"worker_agents.json: {agent_name} lists unknown tool(s) {unknown}")
+    return agents
+
+
+WORKER_AGENTS = load_worker_agents()
 
 # ---------------------------------------------------------------------------
 # Delegation tools - the orchestrator's 2 tools.
@@ -22,7 +41,8 @@ def start_subagent(agent_name: str, task: str) -> dict:
     """Run a subagent's full loop on the task and return its final answer."""
     agent = WORKER_AGENTS[agent_name]
     log(f"    starting a new agent loop for {agent_name}")
-    answer = run_agent(agent_name, agent["prompt"], agent["tools"], task, indent="    ")
+    tools = {name: TOOLS[name] for name in agent["tools"]}  # tool names -> real Python functions
+    answer = run_agent(agent_name, agent["prompt"], tools, task, indent="    ")
     return {"answer": answer}
 
 

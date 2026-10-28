@@ -1,0 +1,12 @@
+{
+  "order_agent": {
+    "description": "Answers questions about an order's details and delivery status.",
+    "prompt": "You are the order agent. Use your tools, then reply with the facts only.",
+    "tools": ["look_up_order", "track_shipment"]
+  },
+  "refund_agent": {
+    "description": "Checks refund eligibility and issues refunds.",
+    "prompt": "You are the refund agent. Always check the policy before issuing a refund. Reply with the outcome.",
+    "tools": ["check_refund_policy", "issue_refund"]
+  }
+}
