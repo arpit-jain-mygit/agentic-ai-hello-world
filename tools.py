@@ -19,13 +19,13 @@ ORDERS = {
 # ---------------------------------------------------------------------------
 # Order tools (used by the order agent)
 # ---------------------------------------------------------------------------
-def look_up_order(order_id: str) -> dict:
+def look_up_order(order_id: str) -> dict:  # plain tool: fixed code, returns at once
     """Return the order record, or say it was not found."""
     order = ORDERS.get(order_id)
     return {"found": False} if order is None else {"found": True, **order}
 
 
-def track_shipment(order_id: str) -> dict:
+def track_shipment(order_id: str) -> dict:  # plain tool: fixed code, returns at once
     """Return the delivery status of an order."""
     order = ORDERS.get(order_id)
     return {"tracking": "Unknown order"} if order is None else {"tracking": f"Status: {order['status']}"}
@@ -34,7 +34,7 @@ def track_shipment(order_id: str) -> dict:
 # ---------------------------------------------------------------------------
 # Refund tools (used by the refund agent)
 # ---------------------------------------------------------------------------
-def check_refund_policy(order_id: str) -> dict:
+def check_refund_policy(order_id: str) -> dict:  # plain tool: fixed code, returns at once
     """Refunds are allowed within 30 days of delivery."""
     order = ORDERS.get(order_id)
     if order is None or order["days_since_delivery"] is None:
@@ -42,7 +42,7 @@ def check_refund_policy(order_id: str) -> dict:
     return {"eligible": order["days_since_delivery"] <= 30, "rule": "Refunds allowed within 30 days of delivery"}
 
 
-def issue_refund(order_id: str, amount: float) -> dict:
+def issue_refund(order_id: str, amount: float) -> dict:  # plain tool: fixed code, returns at once
     """Pretend to refund the customer."""
     return {"refunded": True, "order_id": order_id, "amount": amount}
 

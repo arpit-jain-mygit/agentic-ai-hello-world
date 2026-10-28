@@ -25,12 +25,12 @@ def start_subagent(agent_name: str, task: str) -> dict:
     return {"answer": answer}
 
 
-def ask_order_agent(task: str) -> dict:
+def ask_order_agent(task: str) -> dict:  # this tool's body starts a whole agent
     """Delegation tool: hand a task to the order agent."""
     return start_subagent("order_agent", task)
 
 
-def ask_refund_agent(task: str) -> dict:
+def ask_refund_agent(task: str) -> dict:  # this tool's body starts a whole agent
     """Delegation tool: hand a task to the refund agent."""
     return start_subagent("refund_agent", task)
 
