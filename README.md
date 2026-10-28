@@ -65,6 +65,15 @@ loop.py   |     [order_agent] task: Find the delivery status and details for ord
 loop.py   |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs in tools.py
 ```
 
+After every model reply the loop also logs a `stop_reason` line, the signal that decides whether the loop continues:
+
+```
+loop.py   | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)   ← keep looping
+loop.py   |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)   ← done
+```
+
+`stop_reason` is the Claude name (`tool_use`, `end_turn`, `max_tokens`, `refusal`), worked out from Gemini's reply by `claude_stop_reason()` in [loop.py](loop.py). Gemini's own `finish_reason` is `STOP` in both cases, so the loop decides by checking whether the reply contains tool calls.
+
 Every line starts with the file that printed it, and each tool call says which file the tool's code lives in, so you can follow the run through the code.
 
 This is the model's stated reason, which it writes as part of the tool call. It works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.

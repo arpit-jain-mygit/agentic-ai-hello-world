@@ -22,6 +22,22 @@ def log(msg: str) -> None:
         print(f"loop.py   | {line}")
 
 
+def claude_stop_reason(response) -> str:
+    """
+    Translate Gemini's reply into the Claude stop_reason it would have.
+    Gemini's own finish_reason is "STOP" both when it wants a tool and when it is done,
+    so we look at whether the reply contains tool calls.
+    """
+    finish = response.candidates[0].finish_reason
+    if response.function_calls:
+        return "tool_use"      # wants tools -> keep looping
+    if finish == types.FinishReason.MAX_TOKENS:
+        return "max_tokens"    # cut off by the output limit
+    if finish in (types.FinishReason.SAFETY, types.FinishReason.PROHIBITED_CONTENT):
+        return "refusal"       # blocked for safety
+    return "end_turn"          # finished normally -> stop
+
+
 def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str = "") -> str:
     """
     Run one agent until it gives a final answer.
@@ -47,10 +63,16 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         response = client.models.generate_content(model=MODEL, contents=contents, config=config)
         contents.append(response.candidates[0].content)
 
+        # The signal that drives the loop: log Gemini's value and the Claude equivalent.
+        stop_reason = claude_stop_reason(response)
+        finish = response.candidates[0].finish_reason
+        log(f"{indent}[{name}] stop_reason={stop_reason}  (Gemini finish_reason={finish.name if finish else None})")
+
         # No tool requested -> finished.  (Claude: stop_reason == "end_turn")
-        if not response.function_calls:
-            log(f"{indent}[{name}] done: {response.text.strip()}")
-            return response.text
+        if stop_reason != "tool_use":
+            answer = (response.text or "").strip() or f"(no text - stopped with {stop_reason})"
+            log(f"{indent}[{name}] done: {answer}")
+            return answer
 
         # ACT: the model only ASKED for tools; our code runs them.  (Claude: stop_reason == "tool_use")
         result_parts = []
