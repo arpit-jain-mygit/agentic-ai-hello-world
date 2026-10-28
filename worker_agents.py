@@ -3,7 +3,7 @@ worker_agents.py - the 2 worker agents (CCAF 1.3).
 
 Orchestrator + workers is the "orchestrator-workers" pattern (CCAF 1.6).
 
-An AGENT = a model + a system prompt + its own tools, running the loop in loop.py.
+An AGENT = a model + a system prompt + its own tools, running the loop in agent_loop.py.
 This file only DEFINES the agents. It doesn't start them; the orchestrator does that.
 
     order_agent    tools: look_up_order, track_shipment

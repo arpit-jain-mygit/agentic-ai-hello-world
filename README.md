@@ -26,7 +26,7 @@ Tools and agents live in separate files, so you can always tell which is which:
 | [orchestrator.py](orchestrator.py) | **agent** | The coordinator agent, plus its delegation tools (`ask_order_agent`, `ask_refund_agent`) that start a subagent. |
 | [worker_agents.py](worker_agents.py) | **agents** | The 2 worker agents: `order_agent` and `refund_agent` (prompt + description + their tools). |
 | [tools.py](tools.py) | **tools** | The 4 plain tools (Python functions), their declarations, and fake order data. |
-| [loop.py](loop.py) | engine | `run_agent()`: the agentic loop that **every** agent runs. |
+| [agent_loop.py](agent_loop.py) | engine | `run_agent()`: the agentic loop that **every** agent runs. |
 | [logs.py](logs.py) | helper | `log()`: prints each trace line tagged with `file:function`. |
 
 ## Tool vs agent
@@ -74,13 +74,13 @@ orchestrator          tools: ask_order_agent, ask_refund_agent   (delegation too
 ```
 main.py
  └─ orchestrator.run_orchestrator(question)
-     └─ loop.run_agent("orchestrator")                              ← agent 1
+     └─ agent_loop.run_agent("orchestrator")                              ← agent 1
           model: "call ask_order_agent"
-           └─ orchestrator.ask_order_agent() → loop.run_agent("order_agent")   ← agent 2
+           └─ orchestrator.ask_order_agent() → agent_loop.run_agent("order_agent")   ← agent 2
                 model: "call look_up_order" → tools.look_up_order()
                 model: "done" → answer goes back to the orchestrator
           model: "call ask_refund_agent"
-           └─ orchestrator.ask_refund_agent() → loop.run_agent("refund_agent")  ← agent 3
+           └─ orchestrator.ask_refund_agent() → agent_loop.run_agent("refund_agent")  ← agent 3
                 model: "call check_refund_policy" → tools.check_refund_policy()
                 model: "call issue_refund"        → tools.issue_refund()
                 model: "done" → answer goes back to the orchestrator
@@ -95,28 +95,28 @@ Every line starts with **where** it was printed from, as `file:function`, and ea
 
 ```
 main.py:main                   | USER: Order 9931 arrived broken. Where is it and can I get a refund?
-loop.py:run_agent              | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)
-loop.py:run_agent              | [orchestrator] why: The customer wants to know where the order is.
-loop.py:run_agent              | [orchestrator] calls ask_order_agent({'task': '...'})  -> runs orchestrator.py:ask_order_agent
+agent_loop.py:run_agent        | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)
+agent_loop.py:run_agent        | [orchestrator] why: The customer wants to know where the order is.
+agent_loop.py:run_agent        | [orchestrator] calls ask_order_agent({'task': '...'})  -> runs orchestrator.py:ask_order_agent
 orchestrator.py:start_subagent |     starting a new agent loop for order_agent
-loop.py:run_agent              |     [order_agent] task: ...
-loop.py:run_agent              |     [order_agent] stop_reason=tool_use  (Gemini finish_reason=STOP)
-loop.py:run_agent              |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs tools.py:look_up_order
-loop.py:run_agent              |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)
-loop.py:run_agent              |     [order_agent] done: ...
+agent_loop.py:run_agent        |     [order_agent] task: ...
+agent_loop.py:run_agent        |     [order_agent] stop_reason=tool_use  (Gemini finish_reason=STOP)
+agent_loop.py:run_agent        |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs tools.py:look_up_order
+agent_loop.py:run_agent        |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)
+agent_loop.py:run_agent        |     [order_agent] done: ...
 main.py:main                   | FINAL ANSWER: ...
 ```
 
-- **Left column** (`file:function`): the code running at that moment. All three agents show `loop.py:run_agent`, because they share one loop.
+- **Left column** (`file:function`): the code running at that moment. All three agents show `agent_loop.py:run_agent`, because they share one loop.
 - **`-> runs tools.py:...`**: a plain tool. **`-> runs orchestrator.py:ask_...`**: a tool that starts an agent, so the next lines are that subagent working (indented).
-- **`stop_reason`**: the signal that drives the loop, using the Claude names (`tool_use` = keep looping, `end_turn` = done, also `max_tokens`, `refusal`). It's worked out by `claude_stop_reason()` in [loop.py](loop.py), because Gemini's own `finish_reason` is `STOP` in both cases.
+- **`stop_reason`**: the signal that drives the loop, using the Claude names (`tool_use` = keep looping, `end_turn` = done, also `max_tokens`, `refusal`). It's worked out by `claude_stop_reason()` in [agent_loop.py](agent_loop.py), because Gemini's own `finish_reason` is `STOP` in both cases.
 - **`why:`**: the delegation tools require a `reason` argument, so the model must state why it picked that agent. This is its stated reason, written as part of the tool call; it works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.
 
 ## CCAF topics covered
 
 | CCAF | Topic | Where in the code |
 |---|---|---|
-| 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [loop.py](loop.py) `run_agent()`, `claude_stop_reason()` |
+| 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [agent_loop.py](agent_loop.py) `run_agent()`, `claude_stop_reason()` |
 | 1.2 | Coordinator + subagents, hub-and-spoke | [orchestrator.py](orchestrator.py) `run_orchestrator()`, `ORCHESTRATOR_PROMPT` |
 | 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `ask_order_agent()`, `ask_refund_agent()`, `start_subagent()`, [worker_agents.py](worker_agents.py) `WORKER_AGENTS` |
 | 2.1 | Tool = function + description the model chooses from | [tools.py](tools.py) `TOOLS`, `declare()` |

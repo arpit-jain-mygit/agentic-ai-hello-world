@@ -4,7 +4,7 @@ logs.py - one tiny helper that prints every trace line.
 Each line starts with WHERE it was printed from, as file:function,
 so you can follow a run through the code, e.g.
 
-    loop.py:run_agent              | [order_agent] calls look_up_order(...)
+    agent_loop.py:run_agent        | [order_agent] calls look_up_order(...)
 """
 
 import inspect

@@ -1,5 +1,5 @@
 """
-loop.py - the agentic loop (CCAF 1.1). Every agent in this app runs this one function.
+agent_loop.py - the agentic loop (CCAF 1.1). Every agent in this app runs this one function.
 
     Perceive -> Reason -> Act -> Observe, repeated until the model stops asking for tools.
 """

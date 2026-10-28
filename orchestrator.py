@@ -8,7 +8,7 @@ The orchestrator is an agent too, but it does no work itself. Its only tools are
 """
 
 from logs import log
-from loop import run_agent
+from agent_loop import run_agent
 from worker_agents import WORKER_AGENTS
 from tools import declare
 
