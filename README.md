@@ -34,6 +34,16 @@ Orchestrator            tools: ask_order_agent, ask_refund_agent   (spawn a suba
 
 All three agents use the same `run_agent()` loop. When the orchestrator calls `ask_refund_agent(task)`, a brand-new loop starts for the refund agent with only that task text, and its final answer comes back as the tool result.
 
+**How many agents?** Three, even though `main` calls `run_agent()` only once:
+
+| Agent | Started by | Its tools |
+|---|---|---|
+| Orchestrator | `main`, directly | `ask_order_agent`, `ask_refund_agent` |
+| Order agent | the orchestrator, when its model calls `ask_order_agent` | `look_up_order`, `track_shipment` |
+| Refund agent | the orchestrator, when its model calls `ask_refund_agent` | `check_refund_policy`, `issue_refund` |
+
+To the orchestrator a subagent *looks* like a tool (call in, answer out), but inside it is a full agent: its own model loop, system prompt, tools and context. A plain tool like `look_up_order` is fixed code that runs one step; a subagent decides for itself which tools to call and how many times.
+
 ## Roadmap
 
 Planned steps, one CCAF topic at a time:
