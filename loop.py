@@ -15,6 +15,9 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 # Safety cap so a confused agent can't loop forever (CCAF 1.1 anti-pattern).
 MAX_TURNS = 5
 
+# Set SHOW_THINKING=1 to also print a summary of WHY the model chose each step.
+SHOW_THINKING = os.environ.get("SHOW_THINKING") == "1"
+
 
 def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str = "") -> str:
     """
@@ -34,12 +37,19 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
     config = types.GenerateContentConfig(
         system_instruction=system_prompt,
         tools=[types.Tool(function_declarations=[decl for _, decl in tools.values()])],
+        # Ask the model to think a bit more and return a short summary of that thinking.
+        thinking_config=types.ThinkingConfig(include_thoughts=True, thinking_level="low") if SHOW_THINKING else None,
     )
 
     for _ in range(MAX_TURNS):
         # PERCEIVE + REASON: the model reads everything so far and decides what to do.
         response = client.models.generate_content(model=MODEL, contents=contents, config=config)
         contents.append(response.candidates[0].content)
+
+        # The REASON step, made visible: print the model's thought summary, if any.
+        for part in response.candidates[0].content.parts or []:
+            if part.thought and part.text:
+                print(f"{indent}[{name}] thinks: {part.text.strip()}")
 
         # No tool requested -> finished.  (Claude: stop_reason == "end_turn")
         if not response.function_calls:
