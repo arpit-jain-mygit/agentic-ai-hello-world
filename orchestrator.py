@@ -12,26 +12,43 @@ from subagents import SUBAGENTS
 from tools import declare
 
 # ---------------------------------------------------------------------------
-# Delegation tools - the bridge between the orchestrator and the subagents.
-# To the orchestrator's model, ask_<agent> is just a tool (call in, answer out).
-# Inside, it runs that subagent's whole loop and returns its final answer.
+# Delegation tools - the orchestrator's 2 tools.
+# To the orchestrator's model these are ordinary tools (call in, answer out).
+# The only difference from a plain tool: their body starts a whole subagent.
 # (Claude's Task / Agent tool works the same way.)
 # ---------------------------------------------------------------------------
-def delegation_tool(agent_name: str):
+def start_subagent(agent_name: str, task: str) -> dict:
+    """Run a subagent's full loop on the task and return its final answer."""
     agent = SUBAGENTS[agent_name]
+    print(f"{'orchestrator.py':<15} |     ask_{agent_name}: starting a new agent loop for {agent_name}")
+    answer = run_agent(agent_name, agent["prompt"], agent["tools"], task, indent="    ")
+    return {"answer": answer}
 
-    def ask_agent(task: str) -> dict:
-        print(f"{'orchestrator.py':<15} |     ask_{agent_name}: starting a new agent loop for {agent_name}")
-        answer = run_agent(agent_name, agent["prompt"], agent["tools"], task, indent="    ")
-        return {"answer": answer}
 
-    declaration = declare(
-        f"ask_{agent_name}",
-        agent["description"] + " Pass a complete task: the subagent knows nothing else.",
-        task="string",
-        reason="string",  # makes the model say WHY it picked this agent (printed as "why:" in the log)
-    )
-    return ask_agent, declaration
+def ask_order_agent(task: str) -> dict:
+    """Delegation tool: hand a task to the order agent."""
+    return start_subagent("order_agent", task)
+
+
+def ask_refund_agent(task: str) -> dict:
+    """Delegation tool: hand a task to the refund agent."""
+    return start_subagent("refund_agent", task)
+
+
+# What the orchestrator's model is told about these 2 tools.
+# The description comes from the subagent's definition, so it knows WHEN to use each one.
+# "reason" makes the model say WHY it picked that agent (printed as "why:" in the log).
+HANDOFF_HINT = " Pass a complete task: the subagent knows nothing else."
+ORCHESTRATOR_TOOLS = {
+    "ask_order_agent": (
+        ask_order_agent,
+        declare("ask_order_agent", SUBAGENTS["order_agent"]["description"] + HANDOFF_HINT, task="string", reason="string"),
+    ),
+    "ask_refund_agent": (
+        ask_refund_agent,
+        declare("ask_refund_agent", SUBAGENTS["refund_agent"]["description"] + HANDOFF_HINT, task="string", reason="string"),
+    ),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +58,6 @@ ORCHESTRATOR_PROMPT = (
     "You are a customer-support coordinator. You do not do the work yourself: "
     "delegate to your subagents, then combine their answers into one short reply for the customer."
 )
-ORCHESTRATOR_TOOLS = {f"ask_{name}": delegation_tool(name) for name in SUBAGENTS}
 
 
 def run_orchestrator(question: str) -> str:

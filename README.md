@@ -41,7 +41,7 @@ Tools and agents live in separate files, so you can always tell which is which:
 
 1. **A model can't run anything.** All it can do is write text. To get something done, it writes a tool request, such as "call `look_up_order` with `order_id=9931`". Our code reads that request and runs the matching Python function.
 2. **So the model can't start another agent by itself either.** It has no "start agent" ability. It can only ask for a tool by name.
-3. **So we give it a tool whose Python function starts an agent.** When the orchestrator's model asks for `ask_refund_agent`, our code runs that function, and the function's body calls `run_agent(...)` for the refund agent (see `delegation_tool()` in [orchestrator.py](orchestrator.py)).
+3. **So we give it a tool whose Python function starts an agent.** When the orchestrator's model asks for `ask_refund_agent`, our code runs that function, and the function's body calls `run_agent(...)` for the refund agent (see `ask_refund_agent()` and `start_subagent()` in [orchestrator.py](orchestrator.py)).
 4. **The model can't tell the difference.** For both kinds of tool it sends a name and inputs, and gets one result back. What ran in between is hidden from it.
 
 The only difference is what the Python function does when it runs:
@@ -51,8 +51,7 @@ def look_up_order(order_id):          # plain tool: fixed code, returns at once
     return ORDERS[order_id]
 
 def ask_refund_agent(task):           # delegation tool: its body starts a whole agent
-    answer = run_agent("refund_agent", REFUND_PROMPT, REFUND_TOOLS, task)
-    return {"answer": answer}
+    return start_subagent("refund_agent", task)   # runs run_agent(...) for the refund agent
 ```
 
 **Analogy:** the manager sits in a closed room and can only pass notes through a slot. A note might say "look up order 9931", and the assistant outside checks the system and passes the answer back. Or it might say "ask Riya about a refund", and the assistant takes it to Riya, who works on it for a while using her own tools and then writes a reply that comes back through the slot. From inside the room both look the same: a note out, a reply in. Behind the slot, one was a quick lookup and the other was a person doing real work.
@@ -76,11 +75,11 @@ main.py
  └─ orchestrator.run_orchestrator(question)
      └─ loop.run_agent("orchestrator")                              ← agent 1
           model: "call ask_order_agent"
-           └─ orchestrator.ask_agent() → loop.run_agent("order_agent")   ← agent 2
+           └─ orchestrator.ask_order_agent() → loop.run_agent("order_agent")   ← agent 2
                 model: "call look_up_order" → tools.look_up_order()
                 model: "done" → answer goes back to the orchestrator
           model: "call ask_refund_agent"
-           └─ orchestrator.ask_agent() → loop.run_agent("refund_agent")  ← agent 3
+           └─ orchestrator.ask_refund_agent() → loop.run_agent("refund_agent")  ← agent 3
                 model: "call check_refund_policy" → tools.check_refund_policy()
                 model: "call issue_refund"        → tools.issue_refund()
                 model: "done" → answer goes back to the orchestrator
@@ -115,7 +114,7 @@ loop.py         |     [order_agent] done: ...
 |---|---|---|
 | 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [loop.py](loop.py) `run_agent()`, `claude_stop_reason()` |
 | 1.2 | Coordinator + subagents, hub-and-spoke | [orchestrator.py](orchestrator.py) `run_orchestrator()`, `ORCHESTRATOR_PROMPT` |
-| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `delegation_tool()`, [subagents.py](subagents.py) `SUBAGENTS` |
+| 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `ask_order_agent()`, `ask_refund_agent()`, `start_subagent()`, [subagents.py](subagents.py) `SUBAGENTS` |
 | 2.1 | Tool = function + description the model chooses from | [tools.py](tools.py) `TOOLS`, `declare()` |
 
 ## Roadmap
@@ -141,4 +140,4 @@ Next topics to add to the same app:
 | Tool schema | `input_schema` | `parameters_json_schema` |
 | System prompt | `system` | `system_instruction` |
 | Force a tool | `tool_choice` (`auto` / `any` / `tool` / `none`) | `tool_config` function-calling mode (`AUTO` / `ANY` / `NONE`, plus allowed names) |
-| Spawn a subagent | Task / Agent tool (Agent SDK) | a delegation tool that starts another loop (`orchestrator.delegation_tool`) |
+| Spawn a subagent | Task / Agent tool (Agent SDK) | a delegation tool that starts another loop (`orchestrator.ask_refund_agent`) |
