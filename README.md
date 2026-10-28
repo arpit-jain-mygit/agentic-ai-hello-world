@@ -91,23 +91,38 @@ main.py
 
 ## Reading the log
 
-Every line starts with **where** it was printed from, as `file:function`, and each tool call says exactly which Python function will run:
+Every line starts with **where** it was printed from (`file:function`). Inside each agent, every turn of the loop logs its four steps:
 
 ```
 main.py:main                   | USER: Order 9931 arrived broken. Where is it and can I get a refund?
-agent_loop.py:run_agent        | [orchestrator] stop_reason=tool_use  (Gemini finish_reason=STOP)
-agent_loop.py:run_agent        | [orchestrator] why: The customer wants to know where the order is.
-agent_loop.py:run_agent        | [orchestrator] calls ask_order_agent({'task': '...'})  -> runs orchestrator.py:ask_order_agent
+agent_loop.py:run_agent        | [orchestrator] --- turn 1 ---
+agent_loop.py:run_agent        | [orchestrator] PERCEIVE  LLM reads 1 message(s) + 2 tool(s): ask_order_agent, ask_refund_agent
+agent_loop.py:run_agent        | [orchestrator] REASON    stop_reason=tool_use  (Gemini finish_reason=STOP)
+agent_loop.py:run_agent        | [orchestrator] REASON    why: The customer wants to know where the order is.
+agent_loop.py:run_agent        | [orchestrator] ACT       calls ask_order_agent({'task': '...'})  -> runs orchestrator.py:ask_order_agent
 orchestrator.py:start_subagent |     starting a new agent loop for order_agent
-agent_loop.py:run_agent        |     [order_agent] task: ...
-agent_loop.py:run_agent        |     [order_agent] stop_reason=tool_use  (Gemini finish_reason=STOP)
-agent_loop.py:run_agent        |     [order_agent] calls look_up_order({'order_id': '9931'})  -> runs tools.py:look_up_order
-agent_loop.py:run_agent        |     [order_agent] stop_reason=end_turn  (Gemini finish_reason=STOP)
-agent_loop.py:run_agent        |     [order_agent] done: ...
+agent_loop.py:run_agent        |     [order_agent] --- turn 1 ---
+agent_loop.py:run_agent        |     [order_agent] PERCEIVE  LLM reads 1 message(s) + 2 tool(s): look_up_order, track_shipment
+agent_loop.py:run_agent        |     [order_agent] REASON    stop_reason=tool_use  (Gemini finish_reason=STOP)
+agent_loop.py:run_agent        |     [order_agent] ACT       calls look_up_order({'order_id': '9931'})  -> runs tools.py:look_up_order
+agent_loop.py:run_agent        |     [order_agent] OBSERVE   look_up_order returned {'found': True, 'item': 'Headphones', 'price': 120, ...}
+agent_loop.py:run_agent        |     [order_agent] --- turn 2 ---
+agent_loop.py:run_agent        |     [order_agent] PERCEIVE  LLM reads 3 message(s) + 2 tool(s): look_up_order, track_shipment
+agent_loop.py:run_agent        |     [order_agent] REASON    stop_reason=end_turn  (Gemini finish_reason=STOP)
+agent_loop.py:run_agent        |     [order_agent] DONE      Order 9931: headphones, delivered.
+agent_loop.py:run_agent        | [orchestrator] OBSERVE   ask_order_agent returned {'answer': 'Order 9931: headphones, delivered.'}
+...
 main.py:main                   | FINAL ANSWER: ...
 ```
 
-- **Left column** (`file:function`): the code running at that moment. All three agents show `agent_loop.py:run_agent`, because they share one loop.
+| Step | What the log line shows |
+|---|---|
+| **PERCEIVE** | What the LLM is about to read: how many messages are in the conversation so far, and which tools this agent has. The count grows each turn as requests and results are added. |
+| **REASON** | What the LLM decided: `stop_reason` (`tool_use` = "run tools for me", `end_turn` = "here's my answer"), plus the `why:` it gave when picking a subagent. |
+| **ACT** | Which tool our code runs, with which inputs, and exactly which Python function that is. |
+| **OBSERVE** | What the tool returned. It's added to the conversation, so the next turn's PERCEIVE includes it. |
+| **DONE** | The agent's final answer (`end_turn`). For a subagent, this answer becomes the orchestrator's OBSERVE. |
+
 - **`-> runs tools.py:...`**: a plain tool. **`-> runs orchestrator.py:ask_...`**: a tool that starts an agent, so the next lines are that subagent working (indented).
 - **`stop_reason`**: the signal that drives the loop, using the Claude names (`tool_use` = keep looping, `end_turn` = done, also `max_tokens`, `refusal`). It's worked out by `claude_stop_reason()` in [agent_loop.py](agent_loop.py), because Gemini's own `finish_reason` is `STOP` in both cases.
 - **`why:`**: the delegation tools require a `reason` argument, so the model must state why it picked that agent. This is its stated reason, written as part of the tool call; it works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.

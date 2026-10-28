@@ -54,36 +54,43 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         tools=[types.Tool(function_declarations=[decl for _, decl in tools.values()])],
     )
 
-    for _ in range(MAX_TURNS):
-        # PERCEIVE + REASON: the model reads everything so far and decides what to do.
+    for turn in range(1, MAX_TURNS + 1):
+        log(f"{indent}[{name}] --- turn {turn} ---")
+
+        # 1. PERCEIVE: send the whole conversation + this agent's tool list to the LLM.
+        log(f"{indent}[{name}] PERCEIVE  LLM reads {len(contents)} message(s) + {len(tools)} tool(s): {', '.join(tools)}")
         response = client.models.generate_content(model=MODEL, contents=contents, config=config)
         contents.append(response.candidates[0].content)
 
-        # The signal that drives the loop: log Gemini's value and the Claude equivalent.
+        # 2. REASON: the LLM has decided. stop_reason says what it decided:
+        #    tool_use = "run these tools for me", end_turn = "here is my final answer".
         stop_reason = claude_stop_reason(response)
         finish = response.candidates[0].finish_reason
-        log(f"{indent}[{name}] stop_reason={stop_reason}  (Gemini finish_reason={finish.name if finish else None})")
+        log(f"{indent}[{name}] REASON    stop_reason={stop_reason}  (Gemini finish_reason={finish.name if finish else None})")
 
         # No tool requested -> finished.  (Claude: stop_reason == "end_turn")
         if stop_reason != "tool_use":
             answer = (response.text or "").strip() or f"(no text - stopped with {stop_reason})"
-            log(f"{indent}[{name}] done: {answer}")
+            log(f"{indent}[{name}] DONE      {answer}")
             return answer
 
-        # ACT: the model only ASKED for tools; our code runs them.  (Claude: stop_reason == "tool_use")
+        # 3. ACT: the LLM only ASKED for tools; our code runs them.  (Claude: stop_reason == "tool_use")
         result_parts = []
         for call in response.function_calls:
             func, _ = tools[call.name]
             args = dict(call.args)
-            # If the tool asks for a "reason", show it: this is the model explaining its choice.
+            # If the tool asks for a "reason", show it: this is the LLM explaining its choice.
             if "reason" in args:
-                log(f"{indent}[{name}] why: {args.pop('reason')}")
+                log(f"{indent}[{name}] REASON    why: {args.pop('reason')}")
             # Show exactly which Python function will run, as file:function (tools.py or orchestrator.py).
-            log(f"{indent}[{name}] calls {call.name}({args})  -> runs {func.__module__}.py:{func.__name__}")
+            log(f"{indent}[{name}] ACT       calls {call.name}({args})  -> runs {func.__module__}.py:{func.__name__}")
             result = func(**args)
+
+            # 4. OBSERVE: collect the result; it goes back to the LLM at the start of the next turn.
+            log(f"{indent}[{name}] OBSERVE   {call.name} returned {result}")
             result_parts.append(types.Part.from_function_response(name=call.name, response=result))
 
-        # OBSERVE: send results back so the model sees them next turn.
+        # Add the results to the conversation, so the next PERCEIVE includes them.
         contents.append(types.Content(role="user", parts=result_parts))
 
     return f"{name} stopped: hit MAX_TURNS without a final answer"
