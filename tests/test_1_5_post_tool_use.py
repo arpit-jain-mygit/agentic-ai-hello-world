@@ -5,7 +5,7 @@ Checks: the model sees the changed result, the real data is untouched, rules run
 and a call blocked by PreToolUse never reaches PostToolUse.
 """
 
-import hooks
+import tool_hooks
 from agent_loop import run_agent
 from fake_gemini import last_tool_results, tool_call
 from tools import ORDERS, TOOLS
@@ -24,23 +24,23 @@ def test_model_never_sees_the_email(gemini):
 
 def test_hide_email_rule():
     # A PostToolUse rule gets the tool's result and returns a changed copy, or None for "no change".
-    assert hooks.hide_customer_email({"item": "Headphones", "customer_email": "a@b.com"}) == {"item": "Headphones", "customer_email": "***"}
-    assert hooks.hide_customer_email({"tracking": "Status: delivered"}) is None
+    assert tool_hooks.hide_customer_email({"item": "Headphones", "customer_email": "a@b.com"}) == {"item": "Headphones", "customer_email": "***"}
+    assert tool_hooks.hide_customer_email({"tracking": "Status: delivered"}) is None
 
 
 def test_post_rules_run_in_order(monkeypatch):
-    monkeypatch.setattr(hooks, "HOOKS", {"PostToolUse": [
+    monkeypatch.setattr(tool_hooks, "HOOKS", {"PostToolUse": [
         ("*", lambda r: {**r, "steps": r["steps"] + ["first"]}),
         ("*", lambda r: {**r, "steps": r["steps"] + ["second"]}),
         ("other_tool", lambda r: {**r, "steps": ["never"]}),     # matcher doesn't fit, so it is skipped
     ]})
-    assert hooks.run_post_tool_use("look_up_order", {"steps": []}) == {"steps": ["first", "second"]}
+    assert tool_hooks.run_post_tool_use("look_up_order", {"steps": []}) == {"steps": ["first", "second"]}
 
 
 def test_blocked_call_skips_post_hooks(gemini, monkeypatch):
     # PreToolUse blocked the call -> the tool never ran -> there is no result for PostToolUse to change.
     post_ran = []
-    monkeypatch.setattr(hooks, "HOOKS", {
+    monkeypatch.setattr(tool_hooks, "HOOKS", {
         "PreToolUse": [("look_up_order", lambda args: "blocked")],
         "PostToolUse": [("*", lambda r: post_ran.append(r))],
     })

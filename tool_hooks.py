@@ -1,5 +1,5 @@
 """
-hooks.py - code that runs automatically around every tool call (CCAF 1.5).
+tool_hooks.py - code that runs automatically around every tool call (CCAF 1.5).
 
 A prompt rule is followed most of the time. A hook is followed every time,
 because our code runs it - the model cannot skip it.

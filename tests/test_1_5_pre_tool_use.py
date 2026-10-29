@@ -1,11 +1,11 @@
 """
-CCAF 1.5 - PreToolUse hooks, registered in hooks.py (HOOKS), run by the loop through run_pre_tool_use().
+CCAF 1.5 - PreToolUse hooks, registered in tool_hooks.py (HOOKS), run by the loop through run_pre_tool_use().
 Rule enforced in CODE (not the prompt): a refund can never be more than the order's price.
 Checks: over-price refund is blocked, the tool never runs, the model is told why; a valid refund still runs;
 the loop runs ANY registered rule without knowing its name; matchers pick which tools a hook sees.
 """
 
-import hooks
+import tool_hooks
 from agent_loop import run_agent
 from fake_gemini import last_tool_results, tool_call
 from tools import TOOLS
@@ -44,8 +44,8 @@ def test_refund_within_price_runs(gemini):
 
 def test_refund_rule():
     # A rule is a plain function named by WHAT it checks. It returns a reason to block, or None.
-    assert "120" in hooks.refund_not_above_price({"order_id": "9931", "amount": 500})
-    assert hooks.refund_not_above_price({"order_id": "9931", "amount": 120}) is None
+    assert "120" in tool_hooks.refund_not_above_price({"order_id": "9931", "amount": 500})
+    assert tool_hooks.refund_not_above_price({"order_id": "9931", "amount": 120}) is None
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ def test_refund_rule():
 # ---------------------------------------------------------------------------
 def test_loop_runs_any_registered_hook(gemini, monkeypatch):
     # Register a brand-new rule. agent_loop.py has never heard of it, yet it is enforced.
-    monkeypatch.setattr(hooks, "HOOKS", {"PreToolUse": [("look_up_order", lambda args: "lookups are closed")]})
+    monkeypatch.setattr(tool_hooks, "HOOKS", {"PreToolUse": [("look_up_order", lambda args: "lookups are closed")]})
     gemini.script(tool_call("look_up_order", order_id="9931"), "Sorry.")
     ran, tools = spy_tool("look_up_order")
 
@@ -65,15 +65,15 @@ def test_loop_runs_any_registered_hook(gemini, monkeypatch):
 
 def test_matcher_only_sends_matching_tools_to_a_hook():
     # The refund rule is registered for issue_refund only, so other tools are never checked by it.
-    assert hooks.run_pre_tool_use("look_up_order", {"order_id": "9931"}) is None
-    assert hooks.run_pre_tool_use("issue_refund", {"order_id": "9931", "amount": 500}) is not None
+    assert tool_hooks.run_pre_tool_use("look_up_order", {"order_id": "9931"}) is None
+    assert tool_hooks.run_pre_tool_use("issue_refund", {"order_id": "9931", "amount": 500}) is not None
 
 
 def test_star_matcher_sees_every_tool(monkeypatch):
-    monkeypatch.setattr(hooks, "HOOKS", {"PreToolUse": [("*", lambda args: "maintenance window")]})
-    assert hooks.run_pre_tool_use("track_shipment", {}) == "maintenance window"
+    monkeypatch.setattr(tool_hooks, "HOOKS", {"PreToolUse": [("*", lambda args: "maintenance window")]})
+    assert tool_hooks.run_pre_tool_use("track_shipment", {}) == "maintenance window"
 
 
 def test_first_block_wins(monkeypatch):
-    monkeypatch.setattr(hooks, "HOOKS", {"PreToolUse": [("*", lambda a: None), ("*", lambda a: "first"), ("*", lambda a: "second")]})
-    assert hooks.run_pre_tool_use("issue_refund", {}) == "first"
+    monkeypatch.setattr(tool_hooks, "HOOKS", {"PreToolUse": [("*", lambda a: None), ("*", lambda a: "first"), ("*", lambda a: "second")]})
+    assert tool_hooks.run_pre_tool_use("issue_refund", {}) == "first"
