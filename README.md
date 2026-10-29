@@ -73,7 +73,7 @@ orchestrator          tools: ask_order_agent, ask_refund_agent   (delegation too
 
 **Sequence diagram** for *"Order 9931 arrived broken. Where is it and can I get a refund?"*:
 
-![Agentic AI sequence diagram](docs/sequence-diagram.png)
+![Agentic AI sequence diagram](docs/sequence-diagram.webp)
 
 How to read it:
 - The **LLM only decides**: each agent sends it the conversation + its tools, and it replies "call X" or `end_turn`.
