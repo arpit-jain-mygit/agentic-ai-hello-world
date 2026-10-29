@@ -1,5 +1,5 @@
 """
-agent_loop.py - the agentic loop (CCAF 1.1). Every agent in this app runs this one function.
+agents/agent_loop.py - the agentic loop (CCAF 1.1). Every agent in this app runs this one function.
 
     Perceive -> Reason -> Act -> Observe, repeated until the model stops asking for tools.
 """
@@ -9,7 +9,7 @@ import os
 from google import genai
 from google.genai import types
 
-from tool_hooks import run_post_tool_use, run_pre_tool_use
+from tools.hooks import run_post_tool_use, run_pre_tool_use
 from logs import log
 
 # Model can be changed with an env var; default is the free Flash-Lite.
@@ -83,15 +83,15 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             # If the tool asks for a "reason", show it: this is the LLM explaining its choice.
             if "reason" in args:
                 log(f"{indent}[{name}] REASON    why: {args.pop('reason')}")
-            # HOOK (CCAF 1.5): run every PreToolUse rule registered in tool_hooks.py for this tool.
+            # HOOK (CCAF 1.5): run every PreToolUse rule registered in tools/hooks.py for this tool.
             # If one blocks, the tool does NOT run, and the model gets the reason back instead.
             blocked = run_pre_tool_use(call.name, args)
             if blocked:
                 log(f"{indent}[{name}] HOOK      blocked {call.name}({args}): {blocked}")
                 result = {"error": blocked, "blocked_by": "PreToolUse hook"}
             else:
-                # Show exactly which Python function will run, as file:function (tools.py or orchestrator.py).
-                log(f"{indent}[{name}] ACT       calls {call.name}({args})  -> runs {func.__module__}.py:{func.__name__}")
+                # Show exactly which Python function will run, as file:function (tools/functions.py or agents/orchestrator.py).
+                log(f"{indent}[{name}] ACT       calls {call.name}({args})  -> runs {func.__module__.replace(".", "/")}.py:{func.__name__}")
                 result = func(**args)
 
                 # HOOK (CCAF 1.5): run every PostToolUse rule for this tool. It may change the result

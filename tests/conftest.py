@@ -1,7 +1,7 @@
 """
 conftest.py - pytest loads this first, automatically.
 
-1. Lets tests import the app files (agent_loop, orchestrator, ...) from the repo root.
+1. Lets tests import the app packages (agents, tools) from the repo root.
 2. Gives every test a `gemini` fixture: the fake model, already plugged in.
 """
 
@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))           # repo root, for the app files
 sys.path.insert(0, str(ROOT / "tests"))  # tests folder, for fake_gemini
 
-import agent_loop  # noqa: E402
+from agents import agent_loop  # noqa: E402
 from fake_gemini import FakeGemini  # noqa: E402
 
 

@@ -1,5 +1,5 @@
 """
-orchestrator.py - the coordinator agent (CCAF 1.2, 1.3).
+agents/orchestrator.py - the coordinator agent (CCAF 1.2, 1.3).
 
 The orchestrator is an agent too, but it does no work itself. Its only tools are
 "delegation tools" (ask_order_agent, ask_refund_agent): calling one starts a subagent.
@@ -10,7 +10,7 @@ The orchestrator is an agent too, but it does no work itself. Its only tools are
 import json
 from pathlib import Path
 
-from agent_loop import run_agent
+from agents.agent_loop import run_agent
 from logs import log
 from tools import TOOLS, declare
 
@@ -20,7 +20,7 @@ from tools import TOOLS, declare
 # Claude Code defines subagents the same way, as config files in .claude/agents/.
 # ---------------------------------------------------------------------------
 def load_worker_agents(path: Path = Path(__file__).with_name("worker_agents.json")) -> dict:
-    """Read worker_agents.json and check every tool name in it exists in tools.py."""
+    """Read worker_agents.json and check every tool name in it exists in tools/functions.py."""
     agents = json.loads(path.read_text())
     for agent_name, agent in agents.items():
         unknown = [t for t in agent["tools"] if t not in TOOLS]

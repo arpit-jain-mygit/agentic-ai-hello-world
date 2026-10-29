@@ -5,7 +5,7 @@ Checks: stop on end_turn, run the tool on tool_use and send the result back, MAX
 
 from google.genai import types
 
-from agent_loop import MAX_TURNS, claude_stop_reason, run_agent
+from agents.agent_loop import MAX_TURNS, claude_stop_reason, run_agent
 from fake_gemini import last_tool_results, make_response, tool_call
 from tools import TOOLS
 

@@ -1,5 +1,5 @@
 """
-tool_hooks.py - code that runs automatically around every tool call (CCAF 1.5).
+tools/hooks.py - code that runs automatically around every tool call (CCAF 1.5).
 
 A prompt rule is followed most of the time. A hook is followed every time,
 because our code runs it - the model cannot skip it.
@@ -17,7 +17,7 @@ How it is organized (same shape as Claude's Agent SDK hooks):
 To add a rule: write one function, add one line to HOOKS. agent_loop.py never changes.
 """
 
-from tools import ORDERS
+from tools.functions import ORDERS
 
 
 # ---------------------------------------------------------------------------

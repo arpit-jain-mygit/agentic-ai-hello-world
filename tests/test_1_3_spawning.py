@@ -9,7 +9,7 @@ import json
 import pytest
 
 from fake_gemini import tool_call, tool_names
-from orchestrator import ORCHESTRATOR_TOOLS, WORKER_AGENTS, load_worker_agents, run_orchestrator
+from agents.orchestrator import ORCHESTRATOR_TOOLS, WORKER_AGENTS, load_worker_agents, run_orchestrator
 
 
 def script_refund_question(gemini):

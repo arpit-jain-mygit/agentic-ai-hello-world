@@ -4,7 +4,7 @@ Checks: the coordinator only delegates, starts the agent the model picked, and g
 """
 
 from fake_gemini import last_tool_results, tool_call, tool_names
-from orchestrator import WORKER_AGENTS, run_orchestrator
+from agents.orchestrator import WORKER_AGENTS, run_orchestrator
 
 
 def script_order_question(gemini):

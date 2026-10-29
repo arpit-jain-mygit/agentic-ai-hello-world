@@ -1,5 +1,5 @@
 """
-tools.py - the 4 tools the subagents can use, plus fake data.
+tools/functions.py - the 4 tools the subagents can use, plus fake data.
 
 A tool = a plain Python function + a declaration (name, description, inputs).
 The model only ever sees the declaration; our code runs the function. (CCAF 2.1)

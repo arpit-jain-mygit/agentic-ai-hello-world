@@ -9,7 +9,7 @@ Run:
 import sys
 
 from logs import log
-from orchestrator import run_orchestrator
+from agents.orchestrator import run_orchestrator
 
 
 def main() -> None:
