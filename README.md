@@ -73,13 +73,14 @@ orchestrator          tools: ask_order_agent, ask_refund_agent   (delegation too
 
 **Sequence diagram** for *"Order 9931 arrived broken. Where is it and can I get a refund?"*:
 
-![Agentic AI sequence diagram](docs/sequence-diagram.webp)
+![Agentic AI sequence diagram](docs/sequence-diagram.png)
 
 How to read it:
 - The **LLM only decides**: each agent sends it the conversation + its tools, and it replies "call X" or `end_turn`.
 - Each **agent's loop runs the tools**; only the worker agents touch Tools.
 - A subagent starts with **only its task** and loads its **own tools** from `worker_agents.json`.
 - A subagent's `end_turn` answer comes back to the orchestrator as a tool result.
+- The orange letters mark each agent's loop steps: **P**erceive (send to the LLM), **R**eason (the LLM's decision comes back), **A**ct (call a tool or subagent), **O**bserve (the result comes back), and **Done** at `end_turn`. They sit on the side of the agent whose loop it is; the LLM and Tools have no steps of their own. A subagent's **Done** is the orchestrator's **O**.
 - **Facts move only when passed explicitly**: `$120` goes look_up_order → order agent's answer → orchestrator → refund task.
 
 **The same flow, through the code:**
