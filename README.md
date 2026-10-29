@@ -16,6 +16,16 @@ python main.py "Order 9931 arrived broken. Where is it and can I get a refund?"
 
 Get a free key at [Google AI Studio](https://aistudio.google.com/apikey). To try another model, set `GEMINI_MODEL` (default `gemini-3.5-flash-lite`).
 
+## Tests
+
+```bash
+python -m pytest -v
+```
+
+The tests need **no API key**: [tests/fake_gemini.py](tests/fake_gemini.py) stands in for Gemini, and each test scripts what the "model" replies, turn by turn. So the tests check **our code** (loop, orchestrator, hooks), not the model's choices. They are free, instant and give the same result every time.
+
+There's one test file per CCAF objective (`tests/test_1_1_agentic_loop.py`, ...). Each new topic is built **test first**: write its test and watch it fail (before), build the feature, then watch it pass (after). The older tests must keep passing, so a new topic can't quietly break an old one.
+
 ## Files
 
 Tools and agents live in separate files, so you can always tell which is which:
@@ -27,7 +37,9 @@ Tools and agents live in separate files, so you can always tell which is which:
 | [worker_agents.json](worker_agents.json) | **agents (config)** | The 2 worker agents as plain config: `order_agent` and `refund_agent`. Each has a `description` (tells the orchestrator when to use it), a `prompt` (how it behaves) and `tools` (the **names** of its tools in `tools.py`). |
 | [tools.py](tools.py) | **tools** | The 4 plain tools (Python functions), their declarations, and fake order data. |
 | [agent_loop.py](agent_loop.py) | engine | `run_agent()`: the agentic loop that **every** agent runs. |
+| [hooks.py](hooks.py) | guard | `pre_tool_use()`: code that checks every tool call before it runs, and can block it. |
 | [logs.py](logs.py) | helper | `log()`: prints each trace line tagged with `file:function`. |
+| [tests/](tests) | tests | One test file per CCAF objective, plus the fake Gemini. |
 
 **Agents are config, tools are code.** To change an agent's behaviour or tools, edit `worker_agents.json`; no Python needed. `orchestrator.py` loads it at startup, turns each tool name into the real function from `tools.py`, and stops with an error if a name doesn't exist. Claude Code defines subagents the same way: config files in `.claude/agents/` with a description, a tool list and a prompt.
 
@@ -82,7 +94,7 @@ How to read it:
 - A subagent's `end_turn` answer comes back to the orchestrator as a tool result.
 - The orange letters mark each agent's loop steps: **P**erceive (send to the LLM), **R**eason (the LLM's decision comes back), **A**ct (call a tool or subagent), **O**bserve (the result comes back), and **Done** at `end_turn`. They sit on the side of the agent whose loop it is; the LLM and Tools have no steps of their own. A subagent's **Done** is the orchestrator's **O**.
 - **Turn N** marks the start of each loop turn; each agent loops a different number of times (orchestrator 3, order agent 2, refund agent 3).
-- The Tools column is marked as plain tools (fixed code, no LLM, no loop). Its note that `issue_refund` accepts any amount is the gap the next CCAF step (1.5 hooks) will close.
+- The Tools column is marked as plain tools (fixed code, no LLM, no loop). Its note that `issue_refund` accepts any amount was the gap; the 1.5 PreToolUse hook in [hooks.py](hooks.py) now closes it (the diagram doesn't show the hook yet).
 - Sticky notes call out the key ideas: the question and final answer, "LLM has no memory" (every **P** resends the whole history), what the refund agent can and can't see, the orchestrator's **synthesize** step, and where each part lives in the code.
 - **Facts move only when passed explicitly**: `$120` goes look_up_order → order agent's answer → orchestrator → refund task.
 
@@ -137,11 +149,13 @@ main.py:main                   | FINAL ANSWER: ...
 | **PERCEIVE** | What the LLM is about to read: how many messages are in the conversation so far, and which tools this agent has. The count grows each turn as requests and results are added. |
 | **REASON** | What the LLM decided: `stop_reason` (`tool_use` = "run tools for me", `end_turn` = "here's my answer"), plus the `why:` it gave when picking a subagent. |
 | **ACT** | Which tool our code runs, with which inputs, and exactly which Python function that is. |
+| **HOOK** | Only when the PreToolUse hook blocks a call: which call, and why. The tool does **not** run; the model gets the reason back as the result. |
 | **OBSERVE** | What the tool returned. It's added to the conversation, so the next turn's PERCEIVE includes it. |
 | **DONE** | The agent's final answer (`end_turn`). For a subagent, this answer becomes the orchestrator's OBSERVE. |
 
 - **`-> runs tools.py:...`**: a plain tool. **`-> runs orchestrator.py:ask_...`**: a tool that starts an agent, so the next lines are that subagent working (indented).
 - **`stop_reason`**: the signal that drives the loop, using the Claude names (`tool_use` = keep looping, `end_turn` = done, also `max_tokens`, `refusal`). It's worked out by `claude_stop_reason()` in [agent_loop.py](agent_loop.py), because Gemini's own `finish_reason` is `STOP` in both cases.
+- **`HOOK`**: to see the hook block a call, run `python main.py "Order 9931 arrived broken. Refund me $500."` The refund agent asks for `issue_refund(amount=500)`, the hook blocks it (the headphones cost $120), and the agent explains that to the customer.
 - **`why:`**: the delegation tools require a `reason` argument, so the model must state why it picked that agent. This is its stated reason, written as part of the tool call; it works on any model, unlike hidden "thinking", which `generateContent` on Flash-Lite doesn't return.
 
 ## CCAF topics covered
@@ -151,6 +165,7 @@ main.py:main                   | FINAL ANSWER: ...
 | 1.1 | Agentic loop, stop signal, turn cap, feeding results back | [agent_loop.py](agent_loop.py) `run_agent()`, `claude_stop_reason()` |
 | 1.2 | Coordinator + subagents, hub-and-spoke | [orchestrator.py](orchestrator.py) `run_orchestrator()`, `ORCHESTRATOR_PROMPT` |
 | 1.3 | Spawning a subagent is a tool call; isolated context; scoped tools; description tells the coordinator when to use it | [orchestrator.py](orchestrator.py) `ask_order_agent()`, `ask_refund_agent()`, `start_subagent()`, [worker_agents.json](worker_agents.json) |
+| 1.5 | PreToolUse hook: code blocks a refund above the order price; the tool never runs and the model is told why | [hooks.py](hooks.py) `pre_tool_use()`, called in [agent_loop.py](agent_loop.py) before each tool |
 | 2.1 | Tool = function + description the model chooses from | [tools.py](tools.py) `TOOLS`, `declare()` |
 
 ## Roadmap
@@ -159,7 +174,7 @@ Next topics to add to the same app:
 
 | Domain | Topics still to add |
 |---|---|
-| 1. Agentic architecture | 1.4 prerequisite gates and human handoff · 1.5 hooks (block refunds over $500) · 1.6 decomposition patterns · 1.7 sessions (resume, fork) |
+| 1. Agentic architecture | 1.4 prerequisite gates and human handoff · 1.5 PostToolUse hook · 1.6 decomposition patterns · 1.7 sessions (resume, fork) |
 | 2. Tool design & MCP | 2.2 structured errors (`isError`, `isRetryable`) · 2.3 forced tool choice · 2.4 an MCP server |
 | 3. Claude Code config | Claude Code features (CLAUDE.md, skills, plan mode, CI); covered as repo config files rather than app code |
 | 4. Prompting & structured output | 4.1 explicit criteria · 4.2 few-shot · 4.3 structured output via a schema · 4.4 validation + retry · 4.5 batch processing · 4.6 multi-pass review |
