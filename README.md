@@ -82,6 +82,7 @@ How to read it:
 - A subagent's `end_turn` answer comes back to the orchestrator as a tool result.
 - The orange letters mark each agent's loop steps: **P**erceive (send to the LLM), **R**eason (the LLM's decision comes back), **A**ct (call a tool or subagent), **O**bserve (the result comes back), and **Done** at `end_turn`. They sit on the side of the agent whose loop it is; the LLM and Tools have no steps of their own. A subagent's **Done** is the orchestrator's **O**.
 - **Turn N** marks the start of each loop turn; each agent loops a different number of times (orchestrator 3, order agent 2, refund agent 3).
+- The Tools column is marked as plain tools (fixed code, no LLM, no loop). Its note that `issue_refund` accepts any amount is the gap the next CCAF step (1.5 hooks) will close.
 - Sticky notes call out the key ideas: the question and final answer, "LLM has no memory" (every **P** resends the whole history), what the refund agent can and can't see, the orchestrator's **synthesize** step, and where each part lives in the code.
 - **Facts move only when passed explicitly**: `$120` goes look_up_order → order agent's answer → orchestrator → refund task.
 
