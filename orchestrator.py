@@ -19,9 +19,9 @@ from tools import TOOLS, declare
 # Each entry: description (when to use it), prompt (how it behaves), tools (tool NAMES).
 # Claude Code defines subagents the same way, as config files in .claude/agents/.
 # ---------------------------------------------------------------------------
-def load_worker_agents() -> dict:
+def load_worker_agents(path: Path = Path(__file__).with_name("worker_agents.json")) -> dict:
     """Read worker_agents.json and check every tool name in it exists in tools.py."""
-    agents = json.loads(Path(__file__).with_name("worker_agents.json").read_text())
+    agents = json.loads(path.read_text())
     for agent_name, agent in agents.items():
         unknown = [t for t in agent["tools"] if t not in TOOLS]
         if unknown:  # fail fast on a typo, instead of mid-run

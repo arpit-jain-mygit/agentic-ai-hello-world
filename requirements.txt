@@ -1,1 +1,2 @@
 google-genai>=2.33
+pytest>=8
