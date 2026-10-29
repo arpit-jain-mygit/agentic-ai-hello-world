@@ -9,7 +9,7 @@ import os
 from google import genai
 from google.genai import types
 
-from hooks import pre_tool_use
+from hooks import run_hooks
 from logs import log
 
 # Model can be changed with an env var; default is the free Flash-Lite.
@@ -83,12 +83,12 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             # If the tool asks for a "reason", show it: this is the LLM explaining its choice.
             if "reason" in args:
                 log(f"{indent}[{name}] REASON    why: {args.pop('reason')}")
-            # HOOK (CCAF 1.5): our code checks the call first. If it breaks a rule, the tool does NOT run,
-            # and the model gets the reason back instead, so it can tell the customer.
-            blocked = pre_tool_use(call.name, args)
+            # HOOK (CCAF 1.5): run every PreToolUse rule registered in hooks.py for this tool.
+            # If one blocks, the tool does NOT run, and the model gets the reason back instead.
+            blocked = run_hooks("PreToolUse", call.name, args)
             if blocked:
                 log(f"{indent}[{name}] HOOK      blocked {call.name}({args}): {blocked}")
-                result = {"error": blocked, "blocked_by": "pre_tool_use hook"}
+                result = {"error": blocked, "blocked_by": "PreToolUse hook"}
             else:
                 # Show exactly which Python function will run, as file:function (tools.py or orchestrator.py).
                 log(f"{indent}[{name}] ACT       calls {call.name}({args})  -> runs {func.__module__}.py:{func.__name__}")
