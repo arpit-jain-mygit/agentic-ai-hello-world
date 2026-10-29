@@ -9,7 +9,7 @@ import os
 from google import genai
 from google.genai import types
 
-from hooks import run_hooks
+from hooks import run_post_tool_use, run_pre_tool_use
 from logs import log
 
 # Model can be changed with an env var; default is the free Flash-Lite.
@@ -85,7 +85,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
                 log(f"{indent}[{name}] REASON    why: {args.pop('reason')}")
             # HOOK (CCAF 1.5): run every PreToolUse rule registered in hooks.py for this tool.
             # If one blocks, the tool does NOT run, and the model gets the reason back instead.
-            blocked = run_hooks("PreToolUse", call.name, args)
+            blocked = run_pre_tool_use(call.name, args)
             if blocked:
                 log(f"{indent}[{name}] HOOK      blocked {call.name}({args}): {blocked}")
                 result = {"error": blocked, "blocked_by": "PreToolUse hook"}
@@ -93,6 +93,13 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
                 # Show exactly which Python function will run, as file:function (tools.py or orchestrator.py).
                 log(f"{indent}[{name}] ACT       calls {call.name}({args})  -> runs {func.__module__}.py:{func.__name__}")
                 result = func(**args)
+
+                # HOOK (CCAF 1.5): run every PostToolUse rule for this tool. It may change the result
+                # (e.g. hide private data) BEFORE the model sees it.
+                changed = run_post_tool_use(call.name, result)
+                if changed != result:
+                    log(f"{indent}[{name}] HOOK      changed {call.name} result: {result} -> {changed}")
+                result = changed
 
             # 4. OBSERVE: collect the result; it goes back to the LLM at the start of the next turn.
             log(f"{indent}[{name}] OBSERVE   {call.name} returned {result}")

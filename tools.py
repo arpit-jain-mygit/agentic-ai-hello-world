@@ -11,8 +11,8 @@ from google.genai import types
 # Fake data - a tiny in-memory "database", so no real system is needed
 # ---------------------------------------------------------------------------
 ORDERS = {
-    "9931": {"item": "Headphones", "price": 120, "status": "delivered", "days_since_delivery": 3},
-    "4471": {"item": "Laptop stand", "price": 40, "status": "processing", "days_since_delivery": None},
+    "9931": {"item": "Headphones", "price": 120, "status": "delivered", "days_since_delivery": 3, "customer_email": "riya@example.com"},
+    "4471": {"item": "Laptop stand", "price": 40, "status": "processing", "days_since_delivery": None, "customer_email": "sam@example.com"},
 }
 
 

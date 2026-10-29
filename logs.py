@@ -9,11 +9,17 @@ so you can follow a run through the code, e.g.
 
 import inspect
 import os
+import re
 
 
 def log(msg: str) -> None:
     """Print msg, tagged with the file and function that called log()."""
     caller = inspect.stack()[1]                                  # who called log()?
     where = f"{os.path.basename(caller.filename)}:{caller.function}"
-    for line in msg.splitlines():                                # tag every line, even multi-line answers
-        print(f"{where:<30} | {line}")
+    lines = msg.splitlines() or [""]
+    # Lines 2+ of a multi-line message (e.g. a long answer) repeat line 1's indent and [agent] tag,
+    # so you can still tell which agent said them.
+    prefix = re.match(r"\s*(\[[^\]]+\] )?", lines[0]).group(0)
+    print(f"{where:<30} | {lines[0]}")
+    for line in lines[1:]:
+        print(f"{where:<30} | {prefix}{line}")
