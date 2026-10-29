@@ -1,8 +1,8 @@
 """
-CCAF 1.5 - PreToolUse hooks, registered in hooks.py (HOOKS), run by the loop through run_hooks().
+CCAF 1.5 - PreToolUse hooks, registered in hooks.py (HOOKS), run by the loop through run_pre_tool_use().
 Rule enforced in CODE (not the prompt): a refund can never be more than the order's price.
 Checks: over-price refund is blocked, the tool never runs, the model is told why; a valid refund still runs;
-the loop runs ANY registered hook without knowing its name; matchers pick which tools a hook sees.
+the loop runs ANY registered rule without knowing its name; matchers pick which tools a hook sees.
 """
 
 import hooks
@@ -65,15 +65,15 @@ def test_loop_runs_any_registered_hook(gemini, monkeypatch):
 
 def test_matcher_only_sends_matching_tools_to_a_hook():
     # The refund rule is registered for issue_refund only, so other tools are never checked by it.
-    assert hooks.run_hooks("PreToolUse", "look_up_order", {"order_id": "9931"}) is None
-    assert hooks.run_hooks("PreToolUse", "issue_refund", {"order_id": "9931", "amount": 500}) is not None
+    assert hooks.run_pre_tool_use("look_up_order", {"order_id": "9931"}) is None
+    assert hooks.run_pre_tool_use("issue_refund", {"order_id": "9931", "amount": 500}) is not None
 
 
 def test_star_matcher_sees_every_tool(monkeypatch):
     monkeypatch.setattr(hooks, "HOOKS", {"PreToolUse": [("*", lambda args: "maintenance window")]})
-    assert hooks.run_hooks("PreToolUse", "track_shipment", {}) == "maintenance window"
+    assert hooks.run_pre_tool_use("track_shipment", {}) == "maintenance window"
 
 
 def test_first_block_wins(monkeypatch):
     monkeypatch.setattr(hooks, "HOOKS", {"PreToolUse": [("*", lambda a: None), ("*", lambda a: "first"), ("*", lambda a: "second")]})
-    assert hooks.run_hooks("PreToolUse", "issue_refund", {}) == "first"
+    assert hooks.run_pre_tool_use("issue_refund", {}) == "first"
