@@ -39,7 +39,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             return answer
 
         # 3. ACT
-        result_blocks = []
+        tool_results = []
         for block in response.content:
             if block.type != "tool_use":  # one tool_use block = one tool request from Claude
                 continue
@@ -52,9 +52,9 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
 
             # 4. OBSERVE
             log(f"{indent}[{name}] OBSERVE   {block.name} returned {result}")
-            result_blocks.append({"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)})
+            tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)})
 
         messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": result_blocks})
+        messages.append({"role": "user", "content": tool_results})
 
     return f"{name} stopped: hit MAX_TURNS without a final answer"
