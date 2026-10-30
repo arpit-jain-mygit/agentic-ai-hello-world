@@ -49,14 +49,25 @@ logs.py                  shared helper: prints each trace line with file:functio
 
 ## How the loop works
 
-Each turn of `run_agent()` has four steps:
+Each turn of `run_agent()` has four steps, and they run in two loops:
+
+- **Outer loop (once per turn):** Perceive, then Reason.
+- **Inner loop (once per tool request):** Act, then Observe.
 
 1. **Perceive:** send the whole conversation and the agent's tool list to Claude.
-2. **Reason:** Claude replies with tool requests or a final answer. `stop_reason` says which (`tool_use` or `end_turn`).
-3. **Act:** if it asked for tools, our code runs them.
-4. **Observe:** the results are added to the conversation, and the next turn starts.
+2. **Reason:** Claude replies with tool requests or a final answer. `stop_reason` says which.
+3. **Act:** our code runs each tool Claude asked for.
+4. **Observe:** each result is added to the conversation, and the next turn starts.
 
-The loop stops on `end_turn`. `MAX_TURNS` is only a safety cap.
+| `stop_reason` | What the loop does |
+|---|---|
+| `tool_use` | Runs the tools, then loops again |
+| `end_turn` | Returns Claude's answer |
+| `max_tokens` | Retries once with a higher limit, then stops with a note |
+| `pause_turn` | Sends the reply back so Claude continues |
+| `refusal`, `model_context_window_exceeded`, others | Stops with a note |
+
+`MAX_TURNS` is only a safety cap.
 
 A worker agent starts with only the task text, not the coordinator's conversation.
 
