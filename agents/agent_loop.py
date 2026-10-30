@@ -26,7 +26,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         if declarations:
             request["tools"] = declarations
         response = client.messages.create(**request)  # blocks until Claude's whole reply is received and parsed
-        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "assistant", "content": response.content})  # keep Claude's reply for the next turn's request
 
         # 2. REASON
         stop_reason = response.stop_reason
