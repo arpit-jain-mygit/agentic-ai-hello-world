@@ -7,6 +7,8 @@ from logs import log
 
 MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
 MAX_TURNS = 5
+MAX_TOKENS = 16000
+MAX_TOKENS_CAP = 32000
 
 
 def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str = "") -> str:
@@ -17,12 +19,13 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
 
     # PRAO, each turn: Perceive (send the conversation to Claude), Reason (Claude decides),
     # Act (run the tools it asked for), Observe (add the results). Stop when Claude gives an answer.
+    max_tokens = MAX_TOKENS
     for turn in range(1, MAX_TURNS + 1):
         log(f"{indent}[{name}] --- turn {turn} ---")
 
         # 1. PERCEIVE - send the conversation to Claude
         log(f"{indent}[{name}] PERCEIVE  LLM reads {len(messages)} message(s) + {len(tools)} tool(s): {', '.join(tools)}")
-        request = {"model": MODEL, "max_tokens": 16000, "system": system_prompt, "messages": messages}
+        request = {"model": MODEL, "max_tokens": max_tokens, "system": system_prompt, "messages": messages}
         if declarations:
             request["tools"] = declarations
         llm_response = client.messages.create(**request)  # blocks until Claude's whole reply is received and parsed
@@ -32,9 +35,20 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         log(f"{indent}[{name}] REASON    stop_reason={stop_reason}")
         log(f"{indent}[{name}] REASON    content={llm_response.content}")
 
-        if stop_reason != "tool_use":  # end_turn = final answer; max_tokens, refusal, etc. = stop without a tool call
+        if stop_reason == "max_tokens" and max_tokens < MAX_TOKENS_CAP:
+            max_tokens = MAX_TOKENS_CAP
+            log(f"{indent}[{name}] REASON    cut off at max_tokens, retrying with max_tokens={max_tokens}")
+            continue
+
+        if stop_reason == "pause_turn":
+            messages.append({"role": "assistant", "content": llm_response.content})
+            continue
+
+        if stop_reason != "tool_use":  # end_turn = final answer; any other stop_reason stops with a note
             answer = "".join(b.text for b in llm_response.content if b.type == "text").strip()
-            answer = answer or f"(no text - stopped with {stop_reason})"
+            if stop_reason != "end_turn":
+                answer = f"stopped: {stop_reason}. {answer}".strip()
+            answer = answer or "(no text)"
             log(f"{indent}[{name}] DONE      {answer}")
             return answer
 
