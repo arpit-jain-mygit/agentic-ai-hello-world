@@ -25,7 +25,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         request = {"model": MODEL, "max_tokens": 16000, "system": system_prompt, "messages": messages}
         if declarations:
             request["tools"] = declarations
-        response = client.messages.create(**request)
+        response = client.messages.create(**request)  # blocks until Claude's whole reply is received and parsed
         messages.append({"role": "assistant", "content": response.content})
 
         # 2. REASON
