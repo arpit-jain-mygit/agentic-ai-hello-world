@@ -4,6 +4,7 @@ import os
 import anthropic
 
 from logs import log
+from tools.hooks import post_tool_hook, pre_tool_hook
 
 MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
 MAX_TURNS = 5
@@ -68,13 +69,18 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
                 func, _ = tools[block.name]
                 log(f"{indent}[{name}] ACT       calls {block.name}({args})  -> runs {func.__module__.replace('.', '/')}.py:{func.__name__}")
                 # CCAF objective 1.2 - Orchestrate multi-agent systems with coordinator-subagent patterns: manages errors. A tool that raises becomes an error result, not a crash.
+                # CCAF objective 1.5 - Hooks: a pre-execution hook can block the call and redirect it before it runs.
+                blocked = pre_tool_hook(block.name, args)
                 try:
-                    result = func(**args)
+                    result = blocked if blocked is not None else func(**args)
                 except Exception as error:
                     result = {"error": str(error)}
             else:
                 # CCAF objective 1.2 - Orchestrate multi-agent systems with coordinator-subagent patterns: manages errors. An unknown tool name becomes an error result, not a KeyError.
                 result = {"error": f"no tool named {block.name}"}
+
+            # CCAF objective 1.5 - Hooks: a PostToolUse hook normalizes the result before Claude reads it.
+            result = post_tool_hook(block.name, result)
 
             # 4. OBSERVE - add the results
             log(f"{indent}[{name}] OBSERVE   {block.name} returned {result}")
