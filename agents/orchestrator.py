@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from agents.agent_loop import run_agent
+from agents.agent_loop import MODEL, run_agent
 from logs import log
 from tools import TOOLS, declare
 
@@ -15,14 +15,23 @@ def load_worker_agents(path: Path = Path(__file__).with_name("worker_agents.json
     return agents
 
 
+# CCAF objective 1.3 - Agent definition: each worker in worker_agents.json has a description, prompt and tools.
 WORKER_AGENTS = load_worker_agents()
 
 
+# CCAF objective 1.3 - Spawning subagents: a tool call starts a subagent, like the Task tool.
 def start_subagent(agent_name: str, task: str) -> dict:
     agent = WORKER_AGENTS[agent_name]
     log(f"    starting a new agent loop for {agent_name}")
+    # CCAF objective 1.3 - Scope tools tightly: each subagent gets only the tools listed for it.
     tools = {name: TOOLS[name] for name in agent["tools"]}
-    answer = run_agent(agent_name, agent["prompt"], tools, task, indent="    ")
+    # CCAF objective 1.2 - Coordinator-subagent pattern: manages errors. A failed subagent returns an error, not a crash.
+    try:
+        # CCAF objective 1.3 - Passing context: the subagent gets only the task string, not the coordinator's history.
+        # CCAF objective 1.3 - Model per agent: a worker can name a cheaper model in worker_agents.json.
+        answer = run_agent(agent_name, agent["prompt"], tools, task, indent="    ", model=agent.get("model", MODEL))
+    except Exception as error:
+        return {"error": f"{agent_name} failed: {error}"}
     return {"answer": answer}
 
 
@@ -46,11 +55,40 @@ ORCHESTRATOR_TOOLS = {
     ),
 }
 
+# CCAF objective 1.2 - Coordinator-subagent pattern: manages errors. The prompt tells Claude what to do when a subagent fails.
 ORCHESTRATOR_PROMPT = (
     "You are a customer-support coordinator. You do not do the work yourself: "
-    "delegate to your subagents, then combine their answers into one short reply for the customer."
+    "delegate to your subagents, then combine their answers into one short reply for the customer. "
+    "If a subagent returns an error, do not guess its answer: retry once with a clearer task, "
+    "or tell the customer which part could not be checked."
 )
 
 
+# CCAF objective 1.2 - Coordinator-subagent pattern: iterative refinement. A reviewer checks the answer before it is returned.
+REVIEWER_PROMPT = (
+    "You check a customer-support reply. Reply PASS if it fully answers the question "
+    "using only facts from the tool results. Otherwise reply FAIL and say in one line what is missing."
+)
+MAX_REFINEMENTS = 2
+# CCAF objective 1.3 - Model per agent: the coordinator and the reviewer each name their model too.
+ORCHESTRATOR_MODEL = MODEL
+REVIEWER_MODEL = MODEL
+
+
 def run_orchestrator(question: str) -> str:
-    return run_agent("orchestrator", ORCHESTRATOR_PROMPT, ORCHESTRATOR_TOOLS, question)
+    answer = run_agent("orchestrator", ORCHESTRATOR_PROMPT, ORCHESTRATOR_TOOLS, question, model=ORCHESTRATOR_MODEL)
+    for round_number in range(1, MAX_REFINEMENTS + 1):
+        # CCAF objective 1.2 - Iterative refinement: check the answer. If it falls short, re-delegate with the gap.
+        verdict = run_agent("reviewer", REVIEWER_PROMPT, {}, f"Question: {question}\nAnswer: {answer}", indent="  ", model=REVIEWER_MODEL)
+        if verdict.startswith("PASS"):
+            break
+        log(f"refinement {round_number}: reviewer said {verdict}")
+        answer = run_agent(
+            "orchestrator",
+            ORCHESTRATOR_PROMPT,
+            ORCHESTRATOR_TOOLS,
+            f"{question}\nYour previous answer: {answer}\nA reviewer found a gap: {verdict}\n"
+            "Delegate again to fill the gap, then reply with the full corrected answer.",
+            model=ORCHESTRATOR_MODEL,
+        )
+    return answer
