@@ -31,6 +31,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         # 2. REASON
         stop_reason = response.stop_reason
         log(f"{indent}[{name}] REASON    stop_reason={stop_reason}")
+        log(f"{indent}[{name}] REASON    content={response.content}")
 
         if stop_reason != "tool_use":  # end_turn = final answer; max_tokens, refusal, etc. = stop without a tool call
             answer = "".join(b.text for b in response.content if b.type == "text").strip()
