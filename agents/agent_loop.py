@@ -15,6 +15,8 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
     messages = [{"role": "user", "content": task}]
     declarations = [decl for _, decl in tools.values()]
 
+    # PRAO, each turn: Perceive (send the conversation to Claude), Reason (Claude decides),
+    # Act (run the tools it asked for), Observe (add the results). Stop when Claude gives an answer.
     for turn in range(1, MAX_TURNS + 1):
         log(f"{indent}[{name}] --- turn {turn} ---")
 
