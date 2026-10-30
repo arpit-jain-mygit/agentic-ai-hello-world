@@ -25,22 +25,22 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         request = {"model": MODEL, "max_tokens": 16000, "system": system_prompt, "messages": messages}
         if declarations:
             request["tools"] = declarations
-        response = client.messages.create(**request)  # blocks until Claude's whole reply is received and parsed
+        llm_response = client.messages.create(**request)  # blocks until Claude's whole reply is received and parsed
 
         # 2. REASON
-        stop_reason = response.stop_reason
+        stop_reason = llm_response.stop_reason
         log(f"{indent}[{name}] REASON    stop_reason={stop_reason}")
-        log(f"{indent}[{name}] REASON    content={response.content}")
+        log(f"{indent}[{name}] REASON    content={llm_response.content}")
 
         if stop_reason != "tool_use":  # end_turn = final answer; max_tokens, refusal, etc. = stop without a tool call
-            answer = "".join(b.text for b in response.content if b.type == "text").strip()
+            answer = "".join(b.text for b in llm_response.content if b.type == "text").strip()
             answer = answer or f"(no text - stopped with {stop_reason})"
             log(f"{indent}[{name}] DONE      {answer}")
             return answer
 
         # 3. ACT
         tool_results = []
-        for block in response.content:
+        for block in llm_response.content:
             if block.type != "tool_use":  # one tool_use block = one tool request from Claude
                 continue
             func, _ = tools[block.name]
@@ -54,7 +54,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             log(f"{indent}[{name}] OBSERVE   {block.name} returned {result}")
             tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)})
 
-        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "assistant", "content": llm_response.content})
         messages.append({"role": "user", "content": tool_results})
 
     return f"{name} stopped: hit MAX_TURNS without a final answer"
