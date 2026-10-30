@@ -40,7 +40,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
 
         # 3. ACT
         tool_results = []
-        for block in llm_response.content:
+        for block in llm_response.content:  # one piece of Claude's reply: text, thinking or tool_use
             if block.type != "tool_use":  # one tool_use block = one tool request from Claude
                 continue
             func, _ = tools[block.name]
