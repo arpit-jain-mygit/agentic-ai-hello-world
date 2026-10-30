@@ -20,15 +20,13 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
     for turn in range(1, MAX_TURNS + 1):
         log(f"{indent}[{name}] --- turn {turn} ---")
 
-        # 1. PERCEIVE
-        log(f"{indent}[{name}] PERCEIVE  LLM reads {len(messages)} message(s) + {len(tools)} tool(s): {', '.join(tools)}")
+        log(f"{indent}[{name}] PERCEIVE  LLM reads {len(messages)} message(s) + {len(tools)} tool(s): {', '.join(tools)}")  # 1. PERCEIVE
         request = {"model": MODEL, "max_tokens": 16000, "system": system_prompt, "messages": messages}
         if declarations:
             request["tools"] = declarations
         llm_response = client.messages.create(**request)  # blocks until Claude's whole reply is received and parsed
 
-        # 2. REASON
-        stop_reason = llm_response.stop_reason
+        stop_reason = llm_response.stop_reason  # 2. REASON
         log(f"{indent}[{name}] REASON    stop_reason={stop_reason}")
         log(f"{indent}[{name}] REASON    content={llm_response.content}")
 
@@ -38,8 +36,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             log(f"{indent}[{name}] DONE      {answer}")
             return answer
 
-        # 3. ACT
-        tool_results = []
+        tool_results = []  # 3. ACT
         for block in llm_response.content:  # one piece of Claude's reply: text, thinking or tool_use
             if block.type != "tool_use":  # one tool_use block = one tool request from Claude
                 continue
@@ -50,8 +47,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             log(f"{indent}[{name}] ACT       calls {block.name}({args})  -> runs {func.__module__.replace('.', '/')}.py:{func.__name__}")
             result = func(**args)
 
-            # 4. OBSERVE
-            log(f"{indent}[{name}] OBSERVE   {block.name} returned {result}")
+            log(f"{indent}[{name}] OBSERVE   {block.name} returned {result}")  # 4. OBSERVE
             tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)})
 
         messages.append({"role": "assistant", "content": llm_response.content})
