@@ -41,7 +41,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         # 3. ACT
         result_blocks = []
         for block in response.content:
-            if block.type != "tool_use":
+            if block.type != "tool_use":  # one tool_use block = one tool request from Claude
                 continue
             func, _ = tools[block.name]
             args = dict(block.input)
