@@ -5,8 +5,6 @@ A tool = a plain Python function + a declaration (name, description, inputs).
 The model only ever sees the declaration; our code runs the function.
 """
 
-from google.genai import types
-
 # ---------------------------------------------------------------------------
 # Fake data - a tiny in-memory "database", so no real system is needed
 # ---------------------------------------------------------------------------
@@ -50,17 +48,17 @@ def issue_refund(order_id: str, amount: float) -> dict:  # plain tool: fixed cod
 # ---------------------------------------------------------------------------
 # Declarations - what the model is told about each tool
 # ---------------------------------------------------------------------------
-def declare(name: str, description: str, **params: str) -> types.FunctionDeclaration:
-    """Build a tool declaration. params maps arg name -> JSON type, e.g. order_id="string"."""
-    return types.FunctionDeclaration(
-        name=name,
-        description=description,
-        parameters_json_schema={
+def declare(name: str, description: str, **params: str) -> dict:
+    """Build a tool declaration in Claude's format. params maps arg name -> JSON type, e.g. order_id="string"."""
+    return {
+        "name": name,
+        "description": description,
+        "input_schema": {
             "type": "object",
             "properties": {p: {"type": t} for p, t in params.items()},
             "required": list(params),
         },
-    )
+    }
 
 
 # Every tool in one place: name -> (python function, declaration for the model)
