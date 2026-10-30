@@ -1,11 +1,3 @@
-"""
-main.py - the only entry point. Starts the coordinator agent on a question.
-
-Run:
-    export ANTHROPIC_API_KEY=your-key
-    python main.py "Order 9931 arrived broken. Where is it and can I get a refund?"
-"""
-
 import sys
 
 from agents.orchestrator import run_orchestrator
