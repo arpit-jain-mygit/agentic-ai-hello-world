@@ -17,7 +17,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
     messages = [{"role": "user", "content": task}]
     declarations = [decl for _, decl in tools.values()]
 
-    # CCAF objective 1.1 - The agentic loop: keep looping until Claude gives a final answer.
+    # CCAF objective 1.1 - Design and implement agentic loops for autonomous task execution: keep looping until Claude gives a final answer.
     # PRAO, each turn: Perceive (send the conversation to Claude), Reason (Claude decides),
     # Act (run the tools it asked for), Observe (add the results). Stop when Claude gives an answer.
     max_tokens = MAX_TOKENS
@@ -67,19 +67,19 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             if block.name in tools:
                 func, _ = tools[block.name]
                 log(f"{indent}[{name}] ACT       calls {block.name}({args})  -> runs {func.__module__.replace('.', '/')}.py:{func.__name__}")
-                # CCAF objective 1.2 - Coordinator-subagent pattern: manages errors. A tool that raises becomes an error result, not a crash.
+                # CCAF objective 1.2 - Orchestrate multi-agent systems with coordinator-subagent patterns: manages errors. A tool that raises becomes an error result, not a crash.
                 try:
                     result = func(**args)
                 except Exception as error:
                     result = {"error": str(error)}
             else:
-                # CCAF objective 1.2 - Coordinator-subagent pattern: manages errors. An unknown tool name becomes an error result, not a KeyError.
+                # CCAF objective 1.2 - Orchestrate multi-agent systems with coordinator-subagent patterns: manages errors. An unknown tool name becomes an error result, not a KeyError.
                 result = {"error": f"no tool named {block.name}"}
 
             # 4. OBSERVE - add the results
             log(f"{indent}[{name}] OBSERVE   {block.name} returned {result}")
             tool_result = {"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}
-            # CCAF objective 1.2 - Coordinator-subagent pattern: manages errors. is_error tells Claude the call failed, so it can recover.
+            # CCAF objective 1.2 - Orchestrate multi-agent systems with coordinator-subagent patterns: manages errors. is_error tells Claude the call failed, so it can recover.
             if "error" in result:
                 tool_result["is_error"] = True
             tool_results.append(tool_result)
