@@ -35,16 +35,19 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         log(f"{indent}[{name}] REASON    stop_reason={stop_reason}")
         log(f"{indent}[{name}] REASON    content={llm_response.content}")
 
+        # max_tokens: reply was cut off, so retry once with a higher limit
         if stop_reason == "max_tokens" and max_tokens < MAX_TOKENS_CAP:
             max_tokens = MAX_TOKENS_CAP
             log(f"{indent}[{name}] REASON    cut off at max_tokens, retrying with max_tokens={max_tokens}")
             continue
 
+        # pause_turn: server-side tool loop paused, so send the reply back and let Claude continue
         if stop_reason == "pause_turn":
             messages.append({"role": "assistant", "content": llm_response.content})
             continue
 
-        if stop_reason != "tool_use":  # end_turn = final answer; any other stop_reason stops with a note
+        # end_turn: final answer. refusal, model_context_window_exceeded: stop with a note
+        if stop_reason != "tool_use":
             answer = "".join(b.text for b in llm_response.content if b.type == "text").strip()
             if stop_reason != "end_turn":
                 answer = f"stopped: {stop_reason}. {answer}".strip()
@@ -52,7 +55,7 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
             log(f"{indent}[{name}] DONE      {answer}")
             return answer
 
-        # 3. ACT - run the tools it asked for
+        # 3. ACT - tool_use: run the tools it asked for
         tool_results = []
         for block in llm_response.content:  # one piece of Claude's reply: text, thinking or tool_use
             if block.type != "tool_use":  # one tool_use block = one tool request from Claude
