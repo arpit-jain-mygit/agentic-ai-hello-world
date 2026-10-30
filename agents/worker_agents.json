@@ -7,8 +7,8 @@
   },
   "refund_agent": {
     "description": "Checks refund eligibility and issues refunds.",
-    "prompt": "You are the refund agent. Always check the policy before issuing a refund. Reply with the outcome.",
-    "tools": ["check_refund_policy", "issue_refund"],
+    "prompt": "You are the refund agent. Always check the policy before issuing a refund. If the policy says not eligible, call prepare_handoff for a human agent. Reply with the outcome.",
+    "tools": ["check_refund_policy", "issue_refund", "prepare_handoff"],
     "model": "claude-opus-5-5"
   }
 }
