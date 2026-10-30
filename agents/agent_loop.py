@@ -32,6 +32,8 @@ def run_agent(name: str, system_prompt: str, tools: dict, task: str, indent: str
         stop_reason = response.stop_reason
         log(f"{indent}[{name}] REASON    stop_reason={stop_reason}")
 
+        # stop_reason: tool_use = run the tools and loop again; end_turn = final answer;
+        # max_tokens, refusal, etc. = stop without a tool call. Anything but tool_use ends the loop.
         if stop_reason != "tool_use":
             answer = "".join(b.text for b in response.content if b.type == "text").strip()
             answer = answer or f"(no text - stopped with {stop_reason})"
